@@ -711,6 +711,7 @@ export class OlSearchPage extends LitElement {
         <ol-search-bar
           .q=${this._lastQ ?? ''}
           .chips=${this._chips}
+          .noPanel=${true}
         ></ol-search-bar>
 
         <div class="results-body">

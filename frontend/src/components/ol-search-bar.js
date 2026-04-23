@@ -26,6 +26,7 @@ export class OlSearchBar extends LitElement {
     q:          { type: String },
     chips:      { type: Array },
     showFacets: { type: Boolean },
+    noPanel:    { type: Boolean },  // suppress dropdown entirely (results page)
     filters:    { type: Object },
 
     _q:               { state: true },
@@ -51,6 +52,7 @@ export class OlSearchBar extends LitElement {
     this.q          = '';
     this.chips      = [];
     this.showFacets = false;
+    this.noPanel    = false;
     this.filters    = { ...EMPTY_FILTERS };
 
     this._q             = '';
@@ -98,7 +100,7 @@ export class OlSearchBar extends LitElement {
   }
 
   // ── Autocomplete ──────────────────────────────────────────────
-  _onFocus() { this._open = true; }
+  _onFocus() { if (!this.noPanel) this._open = true; }
 
   _onInput(e) {
     this._q = e.target.value;
@@ -185,29 +187,29 @@ export class OlSearchBar extends LitElement {
 
   // ── Styles ─────────────────────────────────────────────────────
   static styles = css`
-    :host { display: block; position: relative; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    :host { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
-    /* Input row */
+    /* Outer wrapper — the position root for the dropdown panel */
+    .search-outer { position: relative; z-index: 10; }
+
+    /* Input row — only the text input + submit + scanner */
     .input-row {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+      display: flex; align-items: center; flex-wrap: nowrap; gap: 5px;
       background: white; border: 1.5px solid hsl(0,0%,78%); border-radius: 8px;
-      padding: 6px 8px; transition: border-color .15s, box-shadow .15s, border-radius .12s;
-      position: relative; z-index: 10;
+      padding: 6px 8px; transition: border-color .15s, box-shadow .15s;
     }
     .input-row:focus-within {
       border-color: hsl(202,96%,37%);
       box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
     }
     .input-row.panel-open {
-      border-radius: 8px 8px 0 0;
       border-color: hsl(202,96%,37%);
-      border-bottom-color: hsl(0,0%,90%);
       box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
     }
-    .input-row.panel-open:focus-within {
-      border-color: hsl(202,96%,37%);
-      border-bottom-color: hsl(0,0%,90%);
-      box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
+
+    /* Chip bar — always visible when chips are present, sits below the input */
+    .chip-bar {
+      display: flex; flex-wrap: wrap; gap: 5px; padding: 5px 2px 2px;
     }
 
     /* Chips */
@@ -262,12 +264,12 @@ export class OlSearchBar extends LitElement {
     .scan-btn:hover { background:hsl(0,0%,96%); border-color:hsl(0,0%,70%); }
     .scan-btn img { display:block; width:18px; height:18px; }
 
-    /* Panel (attached below input-row when open) */
+    /* Panel — floating box below the search-outer wrapper */
     .panel {
-      position:absolute; top:100%; left:0; right:0;
+      position:absolute; top:calc(100% + 3px); left:0; right:0;
       background:white;
-      border:1.5px solid hsl(202,96%,37%); border-top:none;
-      border-radius:0 0 10px 10px;
+      border:1.5px solid hsl(202,96%,37%);
+      border-radius:8px;
       box-shadow:0 8px 28px rgba(0,0,0,.14), 0 0 0 3px hsla(202,96%,37%,.12);
       z-index:500; overflow:visible;
     }
@@ -636,14 +638,11 @@ export class OlSearchBar extends LitElement {
     const q = this._q.trim();
     const showResults = q.length >= 2;
 
-    return html`
-      <div class="input-row ${this._open ? 'panel-open' : ''}">
-        ${(this.chips ?? []).map(c => html`
-          <span class="chip chip-${c.type}">
-            ${c.label}
-            <button class="chip-x" @click=${() => this._removeChip(c.type, c.value)}>×</button>
-          </span>`)}
+    const chips = this.chips ?? [];
 
+    return html`
+      <div class="search-outer">
+      <div class="input-row ${this._open ? 'panel-open' : ''}">
         <div class="input-controls">
           <input class="text-input" type="search" autocomplete="off"
                  placeholder="Search books, authors…" .value=${this._q}
@@ -651,11 +650,10 @@ export class OlSearchBar extends LitElement {
                  @input=${this._onInput}
                  @keydown=${this._onKeyDown}>
 
-          <button class="submit" @click=${this._submit}>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+          <button class="submit" @click=${this._submit} aria-label="Search">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
               <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
             </svg>
-            Search
           </button>
           <span class="scan-sep"></span>
           <a class="scan-btn" title="Scan ISBN barcode"
@@ -667,6 +665,15 @@ export class OlSearchBar extends LitElement {
           </a>
         </div>
       </div>
+
+      ${chips.length ? html`
+        <div class="chip-bar">
+          ${chips.map(c => html`
+            <span class="chip chip-${c.type}">
+              ${c.label}
+              <button class="chip-x" @click=${() => this._removeChip(c.type, c.value)}>×</button>
+            </span>`)}
+        </div>` : ''}
 
       ${this._open ? html`
         <div class="panel">
@@ -720,6 +727,7 @@ export class OlSearchBar extends LitElement {
             </div>
           ` : this.showFacets ? '' : html`<div class="ac-hint-msg">Start typing to search books…</div>`}
         </div>` : ''}
+      </div>
     `;
   }
 }
