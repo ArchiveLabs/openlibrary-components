@@ -3,7 +3,7 @@ import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
   EMPTY_FILTERS, toggleArrayValue, shufflePick,
-  getAvailabilityLabel, getSortLabel,
+  getSortLabel,
 } from '../utils/filters.js';
 import './ol-howto-modal.js';
 
@@ -408,7 +408,7 @@ export class OlSearchBar extends LitElement {
     const f = this.filters;
     switch (name) {
       case 'sort':   return f.sort ? getSortLabel(f.sort) : 'Sort by';
-      case 'avail':  return f.availability ? getAvailabilityLabel(f.availability) : 'Availability';
+      case 'avail':  return 'Availability';
       case 'lang':   return f.languages?.length ? `Language (${f.languages.length})` : 'Language';
       case 'genre': {
         const total = (f.genres?.length ?? 0) + (f.fictionFilter ? 1 : 0);

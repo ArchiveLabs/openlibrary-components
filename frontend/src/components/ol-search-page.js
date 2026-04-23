@@ -6,7 +6,7 @@ import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
   EMPTY_FILTERS, toggleArrayValue, buildChips, buildSearchParams, shufflePick,
-  getAvailabilityLabel, getSortLabel,
+  getSortLabel,
 } from '../utils/filters.js';
 
 const LIMIT = 20;
@@ -403,7 +403,7 @@ export class OlSearchPage extends LitElement {
   _rfLabel(name) {
     switch (name) {
       case 'sort':   return this._sort ? getSortLabel(this._sort) : 'Sort by';
-      case 'avail':  return this._availability ? getAvailabilityLabel(this._availability) : 'Availability';
+      case 'avail':  return 'Availability';
       case 'lang':   return this._languages.length ? `Language (${this._languages.length})` : 'Language';
       case 'genre': {
         const total = this._genres.length + (this._fictionFilter ? 1 : 0);
