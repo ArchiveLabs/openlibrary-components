@@ -117,13 +117,17 @@ export class OlBookCard extends LitElement {
 
   render() {
     const w = this.work ?? {};
-    const coverUrl = w.cover_i
-      ? `https://covers.openlibrary.org/b/id/${w.cover_i}-M.jpg`
+    // Prefer the best (first) edition's data; fall back to work-level fields.
+    const ed      = w.editions?.docs?.[0];
+    const coverId = ed?.cover_i ?? w.cover_i;
+    const linkKey = ed?.key     ?? w.key;
+    const coverUrl = coverId
+      ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
       : null;
-    const workUrl = `https://openlibrary.org${w.key}`;
-    const authors = (w.author_name ?? []).slice(0, 2).join(', ') || 'Unknown author';
-    const access  = ACCESS_META[w.ebook_access];
-    const rating  = w.ratings_average;
+    const workUrl  = `https://openlibrary.org${linkKey}`;
+    const authors  = (w.author_name ?? []).slice(0, 2).join(', ') || 'Unknown author';
+    const access   = ACCESS_META[ed?.ebook_access ?? w.ebook_access];
+    const rating   = w.ratings_average;
     const ratingCount = w.ratings_count;
 
     return html`

@@ -60,7 +60,12 @@ async def search(
         "q": " ".join(q_parts) or "*",
         "page": page,
         "limit": limit,
-        "fields": "key,title,author_name,cover_i,first_publish_year,ratings_average,ratings_count,ebook_access,subject",
+        "fields": (
+            "key,title,author_name,cover_i,first_publish_year,"
+            "ratings_average,ratings_count,ebook_access,subject,"
+            "editions.key,editions.title,editions.language,"
+            "editions.ebook_access,editions.cover_i"
+        ),
     }
 
     if sort:

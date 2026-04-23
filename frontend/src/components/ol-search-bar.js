@@ -114,7 +114,7 @@ export class OlSearchBar extends LitElement {
       try {
         const p = new URLSearchParams({
           q: this._q.trim(), limit: 5,
-          fields: 'key,title,author_name,cover_i,first_publish_year,ratings_average,ebook_access',
+          fields: 'key,title,author_name,cover_i,first_publish_year,ratings_average,ebook_access,editions.key,editions.cover_i,editions.ebook_access',
         });
         const d = await (await fetch(`/api/search?${p}`)).json();
         this._suggestions = d.docs ?? [];
@@ -666,11 +666,15 @@ export class OlSearchBar extends LitElement {
               ${this._suggestions.length === 0
                 ? html`<div class="ac-empty">No results</div>`
                 : this._suggestions.map(w => {
-                    const cover = w.cover_i
-                      ? `https://covers.openlibrary.org/b/id/${w.cover_i}-S.jpg` : null;
-                    const isReadable = w.ebook_access === 'public' || w.ebook_access === 'borrowable';
+                    const ed = w.editions?.docs?.[0];
+                    const coverId = ed?.cover_i ?? w.cover_i;
+                    const linkKey = ed?.key ?? w.key;
+                    const access  = ed?.ebook_access ?? w.ebook_access;
+                    const cover = coverId
+                      ? `https://covers.openlibrary.org/b/id/${coverId}-S.jpg` : null;
+                    const isReadable = access === 'public' || access === 'borrowable';
                     return html`
-                      <a class="ac-row" href="https://openlibrary.org${w.key}"
+                      <a class="ac-row" href="https://openlibrary.org${linkKey}"
                          target="_blank" rel="noopener"
                          @click=${() => this._open = false}>
                         ${cover
