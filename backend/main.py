@@ -72,8 +72,9 @@ async def search(
 
     # Availability maps to OL ebook_access / has_fulltext
     if availability == "readable":
-        # borrowable OR public (open access) — books you can actually read online
-        q_parts.append("(ebook_access:borrowable OR ebook_access:public)")
+        # OL ebook_access is a numeric enum: no_ebook=0, printdisabled=1, borrowable=2, public=3
+        # Range [borrowable TO public] = [2,3], correctly excludes printdisabled
+        q_parts.append("ebook_access:[borrowable TO public]")
         params["q"] = " ".join(q_parts) or "*"
     elif availability in ("open", "borrowable", "printdisabled"):
         params["ebook_access"] = availability
