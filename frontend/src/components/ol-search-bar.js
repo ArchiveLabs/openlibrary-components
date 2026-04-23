@@ -3,7 +3,7 @@ import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
   EMPTY_FILTERS, toggleArrayValue, shufflePick,
-  getLangLabel, getAvailabilityLabel, getSortLabel,
+  getAvailabilityLabel, getSortLabel,
 } from '../utils/filters.js';
 import './ol-howto-modal.js';
 

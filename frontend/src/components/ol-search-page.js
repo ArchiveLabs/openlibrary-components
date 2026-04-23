@@ -5,9 +5,8 @@ import './ol-howto-modal.js';
 import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
-  EMPTY_FILTERS, toggleArrayValue, buildChips, buildSearchParams,
-  spoofAvailabilityCounts, shufflePick,
-  getLangLabel, getAvailabilityLabel, getSortLabel,
+  EMPTY_FILTERS, toggleArrayValue, buildChips, buildSearchParams, shufflePick,
+  getAvailabilityLabel, getSortLabel,
 } from '../utils/filters.js';
 
 const LIMIT = 20;
@@ -439,8 +438,6 @@ export class OlSearchPage extends LitElement {
 
   _renderRFDrop(name, right = false) {
     const cls = `rf-drop${right ? ' right' : ''}`;
-    const counts = spoofAvailabilityCounts(this._numFound);
-
     if (name === 'sort') {
       return html`<div class="${cls}"><div class="rf-drop-scroll">
         ${SORT_OPTIONS.map(o => html`
