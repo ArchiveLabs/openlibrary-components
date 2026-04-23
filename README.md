@@ -11,12 +11,12 @@ A fast, modern playground UI for the [Open Library](https://openlibrary.org) cat
 ## Quick Start
 
 ```bash
-make dev          # starts both Vite (port 5173) and FastAPI (port 8000)
+make dev          # starts both Vite (port 8090) and FastAPI (port 8000)
 # or:
 make up           # Docker Compose (production-like)
 ```
 
-Open http://localhost:5173. Vite proxies `/api/*` requests to FastAPI at port 8000.
+Open http://localhost:8090. Vite proxies `/api/*` requests to FastAPI at port 8000.
 
 ## Stack
 

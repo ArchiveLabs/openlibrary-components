@@ -67,7 +67,7 @@ npm test             # run all Vitest tests (from frontend/)
 npm run lint         # ESLint (from frontend/)
 ```
 
-Always start `make dev` before testing UI changes manually. The Vite proxy handles `/api/*` so both servers must be running.
+Always start `make dev` before testing UI changes manually. Vite serves on port 8090; uvicorn on port 8000. The Vite proxy handles `/api/*` so both must be running. Visit http://localhost:8090.
 
 ## Adding a New Filter
 
