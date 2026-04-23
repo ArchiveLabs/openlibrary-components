@@ -62,7 +62,7 @@ async def search(
         "limit": limit,
         "fields": (
             "key,title,author_name,cover_i,first_publish_year,"
-            "ratings_average,ratings_count,ebook_access,subject,"
+            "ratings_average,ratings_count,ebook_access,subject,series,"
             "editions.key,editions.title,editions.language,"
             "editions.ebook_access,editions.cover_i"
         ),

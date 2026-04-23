@@ -78,6 +78,31 @@ Displays a single search result. Stateless.
 
 ---
 
+### `ol-search-hint`
+
+A dismissible contextual hint bar rendered between the results filter bar and the book cards. Styled to match the filter bar height (40px min, same border).
+
+**Props:**
+- `hint: Object | null` — `{ key: string, message: string, actions?: { label: string, href: string }[] }`
+
+When `hint` is `null`, the component renders nothing. When a user dismisses the hint, the key is stored in `localStorage` as `ol-hint-dismissed:<key>` and the hint stays hidden on future visits.
+
+**Usage in `ol-search-page`:**
+The parent computes the hint via `_computeHint(q, filters, numFound)` after each search response. Add new hint conditions there; each condition must have a unique `key`.
+
+```js
+// Example hint object:
+{
+  key: 'fulltext-suggest',
+  message: 'Fewer results than expected? Try searching inside book text.',
+  actions: [{ label: 'Search inside books', href: 'https://openlibrary.org/search/inside?q=...' }]
+}
+```
+
+**Dismissal:** per-key, persisted in `localStorage`. Clearing `localStorage` resets all dismissals. Private-browsing fallback: dismissed for the session only (localStorage unavailable).
+
+---
+
 ### `ol-header` / `ol-topbar` / `ol-footer`
 
 Layout shell components. Minimal logic.

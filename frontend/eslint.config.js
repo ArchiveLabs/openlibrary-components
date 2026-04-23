@@ -21,6 +21,7 @@ export default [
         Set: 'readonly',
         customElements: 'readonly',
         CustomEvent: 'readonly',
+        localStorage: 'readonly',
       },
     },
     rules: {

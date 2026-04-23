@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { bestEdition } from '../utils/filters.js';
 
 const ACCESS_META = {
   public:        { label: 'Readable',   cls: 'readable'   },
@@ -52,6 +53,16 @@ export class OlBookCard extends LitElement {
 
     /* Body */
     .body { flex: 1; min-width: 0; }
+    .series {
+      font-size: 11px;
+      color: hsl(0, 0%, 50%);
+      margin: 0 0 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
     .title {
       font-family: Georgia, serif;
       font-size: 15px;
@@ -117,30 +128,32 @@ export class OlBookCard extends LitElement {
 
   render() {
     const w = this.work ?? {};
-    // Prefer the best (first) edition's data; fall back to work-level fields.
-    const ed      = w.editions?.docs?.[0];
+    const ed      = bestEdition(w.editions);
     const coverId = ed?.cover_i ?? w.cover_i;
-    const linkKey = ed?.key     ?? w.key;
+    // Link to the best edition page; fall back to work page
+    const linkKey = ed?.key ?? w.key;
     const coverUrl = coverId
       ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
       : null;
-    const workUrl  = `https://openlibrary.org${linkKey}`;
+    const itemUrl  = `https://openlibrary.org${linkKey}`;
     const authors  = (w.author_name ?? []).slice(0, 2).join(', ') || 'Unknown author';
     const access   = ACCESS_META[ed?.ebook_access ?? w.ebook_access];
     const rating   = w.ratings_average;
     const ratingCount = w.ratings_count;
+    const series   = w.series?.[0] ?? null;
 
     return html`
       <div class="card">
-        <a class="cover" href=${workUrl} target="_blank" rel="noopener" tabindex="-1">
+        <a class="cover" href=${itemUrl} target="_blank" rel="noopener" tabindex="-1">
           ${coverUrl
             ? html`<img src=${coverUrl} alt="" loading="lazy">`
             : html`<div class="cover-blank">📖</div>`}
         </a>
 
         <div class="body">
+          ${series ? html`<p class="series">${series}</p>` : ''}
           <p class="title">
-            <a href=${workUrl} target="_blank" rel="noopener">${w.title ?? 'Untitled'}</a>
+            <a href=${itemUrl} target="_blank" rel="noopener">${w.title ?? 'Untitled'}</a>
           </p>
           <p class="author">${authors}</p>
           <div class="meta">

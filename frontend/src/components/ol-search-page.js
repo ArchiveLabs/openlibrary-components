@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import './ol-search-bar.js';
 import './ol-book-card.js';
 import './ol-howto-modal.js';
+import './ol-search-hint.js';
 import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
@@ -57,6 +58,7 @@ export class OlSearchPage extends LitElement {
     _facetsLoading:   { state: true },
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
+    _hint:            { state: true },
   };
 
   constructor() {
@@ -87,6 +89,7 @@ export class OlSearchPage extends LitElement {
     this._facetsLoading   = false;
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
+    this._hint            = null;
     this._authorTimer     = null;
     this._subjectTimer    = null;
 
@@ -160,11 +163,36 @@ export class OlSearchPage extends LitElement {
       const data = await res.json();
       this._results  = data.docs ?? [];
       this._numFound = data.num_found ?? 0;
+      this._hint = this._computeHint(this._lastQ ?? '', this._filters, this._numFound);
     } catch (err) {
       this._error = err.message;
     } finally {
       this._loading = false;
     }
+  }
+
+  /**
+   * Derive a contextual hint for the current search, or return null for none.
+   * Add cases here as new hint types are needed; each must have a unique `key`
+   * so dismissals are stored independently in localStorage.
+   *
+   * @param {string}  q        — raw query string
+   * @param {object}  filters  — current filter state
+   * @param {number}  numFound — result count from OL
+   * @returns {{ key, message, actions? }|null}
+   */
+  // eslint-disable-next-line no-unused-vars
+  _computeHint(q, filters, numFound) {
+    // No hints active yet — return null to keep the hint bar hidden.
+    // Future example:
+    // if (numFound < 5 && q.split(' ').length > 3) {
+    //   return {
+    //     key: 'fulltext-suggest',
+    //     message: 'Fewer results than expected? Try searching inside the text of books.',
+    //     actions: [{ label: 'Search inside books', href: `https://openlibrary.org/search/inside?q=${encodeURIComponent(q)}` }],
+    //   };
+    // }
+    return null;
   }
 
   _paginate(delta) {
@@ -340,9 +368,11 @@ export class OlSearchPage extends LitElement {
     .rf-dice {
       padding:4px 9px; border:none; border-left:1px solid hsl(0,0%,90%);
       background:transparent; cursor:pointer; font-size:15px; flex-shrink:0;
-      transition:transform .2s; line-height:1;
+      line-height:1;
     }
-    .rf-dice:hover { transform:rotate(120deg); background:hsl(0,0%,96%); }
+    .rf-dice:hover { background:hsl(0,0%,96%); }
+    .rf-dice-icon { display:inline-block; transition:transform .2s; }
+    .rf-dice:hover .rf-dice-icon { transform:rotate(120deg); }
 
     /* Fiction pinned section in genre dropdown */
     .rf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
@@ -527,11 +557,11 @@ export class OlSearchPage extends LitElement {
           <input class="rf-search-inline" placeholder="Search authors…" .value=${this._authorSearch}
                  @input=${this._onRFAuthorSearch} @click=${e => e.stopPropagation()}>
           <button class="rf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}>🎲</button>
+                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}><span class="rf-dice-icon">🎲</span></button>
         </div>
         <div class="rf-drop-scroll">
           ${this._facetsLoading ? html`<div class="rf-empty">Loading…</div>` : ''}
-          ${showDefaults ? html`<div class="rf-hint">Popular authors</div>` : ''}
+          ${showDefaults ? html`<div class="rf-hint">Suggested authors</div>` : ''}
           ${showDefaults
             ? this._defaultAuthors.map(name => {
                 const checked = this._authors.includes(name);
@@ -566,11 +596,11 @@ export class OlSearchPage extends LitElement {
           <input class="rf-search-inline" placeholder="Search subjects…" .value=${this._subjectSearch}
                  @input=${this._onRFSubjectSearch} @click=${e => e.stopPropagation()}>
           <button class="rf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}>🎲</button>
+                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}><span class="rf-dice-icon">🎲</span></button>
         </div>
         <div class="rf-drop-scroll">
           ${this._facetsLoading ? html`<div class="rf-empty">Loading…</div>` : ''}
-          ${showDefaults ? html`<div class="rf-hint">Popular subjects</div>` : ''}
+          ${showDefaults ? html`<div class="rf-hint">Suggested subjects</div>` : ''}
           ${showDefaults
             ? this._defaultSubjects.map(name => {
                 const checked = this._subjects.includes(name);
@@ -656,6 +686,7 @@ export class OlSearchPage extends LitElement {
 
         <div class="results-body">
           ${this._renderFilterBar()}
+          <ol-search-hint .hint=${this._hint}></ol-search-hint>
 
           <div class="results-inner">
             ${this._loading ? html`<div class="loading">Searching…</div>` : ''}

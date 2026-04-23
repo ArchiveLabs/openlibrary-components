@@ -62,12 +62,14 @@ docker-compose.yml
 ## Development Workflow
 
 ```bash
-make dev             # Vite on :5173 + FastAPI on :8000 (hot reload)
+make dev             # Vite on :8090 + FastAPI on :8000 (hot reload)
 npm test             # run all Vitest tests (from frontend/)
 npm run lint         # ESLint (from frontend/)
 ```
 
-Always start `make dev` before testing UI changes manually. Vite serves on port 8090; uvicorn on port 8000. The Vite proxy handles `/api/*` so both must be running. Visit http://localhost:8090.
+Always start `make dev` before testing UI changes manually. Vite serves on **port 8090**; uvicorn on **port 8000**. The Vite proxy handles `/api/*` so both must be running. Visit http://localhost:8090.
+
+> **Backend `.venv`:** uvicorn is installed in `backend/.venv/`. The Makefile runs `.venv/bin/uvicorn` explicitly — do not rely on a global uvicorn.
 
 ## Adding a New Filter
 
@@ -110,3 +112,6 @@ Squash fixup commits; keep history as logical milestones.
 - **`printdisabled` is not "readable"**: books with `ebook_access=printdisabled` are only accessible to print-disabled patrons. "Readable Books Only" means `ebook_access:borrowable OR ebook_access:public` — never include `printdisabled` in that set.
 - **Static availability counts**: the counts in the availability dropdown (~50M, ~4.6M, etc.) are hardcoded in `AVAILABILITY_OPTIONS.staticCount`. They are not fetched per-search. Update them periodically as OL's catalog grows.
 - **`ol-search-bar` is display-only for filters**: in hero mode, `ol-search-bar` reads `filters` from its parent and emits `ol-filter-change` events up. It never mutates filter state directly.
+- **Edition resolution**: search results are work-level records. Use `bestEdition(w.editions)` from `filters.js` to pick the highest-ranked edition (`public > borrowable > printdisabled > no_ebook`). Always link to the edition URL (`/books/OL…`) not the work URL (`/works/OL…`) when an edition exists.
+- **Series**: the `series` field is requested from the OL search API and may be an array. Show `w.series?.[0]` above the title if present. Not all works have series data — treat it as optional.
+- **OL `ebook_access` enum (Solr numeric)**: `no_ebook=0, printdisabled=1, borrowable=2, public=3`. The range query `ebook_access:[borrowable TO public]` correctly covers 2–3 and excludes printdisabled.

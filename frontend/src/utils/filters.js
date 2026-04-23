@@ -120,6 +120,17 @@ export const getFictionLabel      = v => FICTION_OPTIONS.find(o => o.value === v
 
 // ── Core operations ───────────────────────────────────────────────────────────
 
+const ACCESS_RANK = { public: 3, borrowable: 2, printdisabled: 1, no_ebook: 0 };
+
+/** Return the edition with the highest ebook_access rank; fall back to first edition. */
+export function bestEdition(editions) {
+  const docs = editions?.docs;
+  if (!docs?.length) return null;
+  return docs.reduce((best, ed) =>
+    (ACCESS_RANK[ed.ebook_access] ?? -1) > (ACCESS_RANK[best.ebook_access] ?? -1) ? ed : best
+  );
+}
+
 /** Toggle a value into/out of an array without mutation. */
 export function toggleArrayValue(arr, value) {
   return arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value];

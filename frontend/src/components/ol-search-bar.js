@@ -2,7 +2,7 @@ import { LitElement, html, css } from 'lit';
 import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
   FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
-  EMPTY_FILTERS, toggleArrayValue, shufflePick,
+  EMPTY_FILTERS, toggleArrayValue, shufflePick, bestEdition,
   getSortLabel,
 } from '../utils/filters.js';
 import './ol-howto-modal.js';
@@ -319,9 +319,11 @@ export class OlSearchBar extends LitElement {
     .pf-dice {
       padding:4px 9px; border:none; border-left:1px solid hsl(0,0%,90%);
       background:transparent; cursor:pointer; font-size:15px; flex-shrink:0;
-      transition:transform .2s; line-height:1;
+      line-height:1;
     }
-    .pf-dice:hover { transform:rotate(120deg); background:hsl(0,0%,96%); }
+    .pf-dice:hover { background:hsl(0,0%,96%); }
+    .pf-dice-icon { display:inline-block; transition:transform .2s; }
+    .pf-dice:hover .pf-dice-icon { transform:rotate(120deg); }
 
     /* Fiction/Nonfiction pinned section in genre dropdown */
     .pf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
@@ -536,10 +538,10 @@ export class OlSearchBar extends LitElement {
           <input class="pf-search-inline" placeholder="Search authors…" .value=${this._authorSearch}
                  @input=${this._onAuthorSearch} @click=${e => e.stopPropagation()}>
           <button class="pf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}>🎲</button>
+                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}><span class="pf-dice-icon">🎲</span></button>
         </div>
         <div class="pf-drop-scroll">
-          ${showDefaults ? html`<div class="pf-hint">Popular authors</div>` : ''}
+          ${showDefaults ? html`<div class="pf-hint">Suggested authors</div>` : ''}
           ${showDefaults
             ? this._defaultAuthors.map(name => {
                 const checked = (f.authors ?? []).includes(name);
@@ -574,10 +576,10 @@ export class OlSearchBar extends LitElement {
           <input class="pf-search-inline" placeholder="Search subjects…" .value=${this._subjectSearch}
                  @input=${this._onSubjectSearch} @click=${e => e.stopPropagation()}>
           <button class="pf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}>🎲</button>
+                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}><span class="pf-dice-icon">🎲</span></button>
         </div>
         <div class="pf-drop-scroll">
-          ${showDefaults ? html`<div class="pf-hint">Popular subjects</div>` : ''}
+          ${showDefaults ? html`<div class="pf-hint">Suggested subjects</div>` : ''}
           ${showDefaults
             ? this._defaultSubjects.map(name => {
                 const checked = (f.subjects ?? []).includes(name);
@@ -666,7 +668,7 @@ export class OlSearchBar extends LitElement {
               ${this._suggestions.length === 0
                 ? html`<div class="ac-empty">No results</div>`
                 : this._suggestions.map(w => {
-                    const ed = w.editions?.docs?.[0];
+                    const ed = bestEdition(w.editions);
                     const coverId = ed?.cover_i ?? w.cover_i;
                     const linkKey = ed?.key ?? w.key;
                     const access  = ed?.ebook_access ?? w.ebook_access;
