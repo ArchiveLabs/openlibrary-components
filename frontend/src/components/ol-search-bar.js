@@ -269,6 +269,7 @@ export class OlSearchBar extends LitElement {
       display:flex; border-bottom:1px solid hsl(0,0%,90%);
       background:hsl(0,0%,98.5%);
     }
+    .pf-bar--round { border-radius: 0 0 9px 9px; }
     .pf-wrap { flex:1; position:relative; display:flex; }
     .pf-wrap + .pf-wrap { border-left:1px solid hsl(0,0%,90%); }
     /* Cog column is narrower than facet columns */
@@ -604,9 +605,9 @@ export class OlSearchBar extends LitElement {
     }
   }
 
-  _renderFacetBar() {
+  _renderFacetBar(roundBottom = false) {
     return html`
-      <div class="pf-bar">
+      <div class="pf-bar ${roundBottom ? 'pf-bar--round' : ''}">
         ${this._renderFacetBtn('avail',  false, 'pf-wrap--first')}
         ${this._renderFacetBtn('lang')}
         ${this._renderFacetBtn('genre')}
@@ -658,7 +659,7 @@ export class OlSearchBar extends LitElement {
 
       ${this._open ? html`
         <div class="panel">
-          ${this.showFacets ? this._renderFacetBar() : ''}
+          ${this.showFacets ? this._renderFacetBar(!this._loading && !showResults) : ''}
 
           ${this._loading ? html`<div class="ac-spin">Searching…</div>` : showResults ? html`
             <div class="ac-scroll">
