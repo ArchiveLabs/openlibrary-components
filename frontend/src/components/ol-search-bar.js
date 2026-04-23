@@ -647,10 +647,13 @@ export class OlSearchBar extends LitElement {
           Search
         </button>
         <span class="scan-sep"></span>
-        <button class="scan-btn" title="Scan ISBN barcode" @click=${e => e.stopPropagation()}>
+        <a class="scan-btn" title="Scan ISBN barcode"
+           href="https://openlibrary.org/barcodescanner?returnTo=/isbn/$$$"
+           target="_blank" rel="noopener"
+           @click=${e => e.stopPropagation()}>
           <img src="https://openlibrary.org/static/images/icons/barcode_scanner.svg"
                alt="Scan barcode" width="18" height="18">
-        </button>
+        </a>
       </div>
 
       ${this._open ? html`

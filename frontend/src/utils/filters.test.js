@@ -186,14 +186,14 @@ describe('buildChips', () => {
     const chips = buildChips(EMPTY_FILTERS);
     expect(chips).toHaveLength(1);
     expect(chips[0]).toEqual({
-      type: 'access', label: 'availability: Readable Books Only', value: 'readable',
+      type: 'access', label: 'Readable Books Only', value: 'readable',
     });
   });
 
-  it('builds an availability chip with correct label', () => {
+  it('builds an availability chip with correct label (no type prefix)', () => {
     const chips = buildChips({ ...EMPTY_FILTERS, availability: 'open' });
     const chip = chips.find(c => c.type === 'access');
-    expect(chip).toEqual({ type: 'access', label: 'availability: Open Access Only', value: 'open' });
+    expect(chip).toEqual({ type: 'access', label: 'Open Access Only', value: 'open' });
   });
 
   it('returns no access chip when availability is empty string', () => {

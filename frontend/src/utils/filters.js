@@ -146,7 +146,7 @@ export function buildChips(filters) {
   if (filters.availability) {
     chips.push({
       type:  'access',
-      label: `availability: ${getAvailabilityLabel(filters.availability)}`,
+      label: getAvailabilityLabel(filters.availability),
       value: filters.availability,
     });
   }
