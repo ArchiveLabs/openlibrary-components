@@ -112,8 +112,11 @@ export class OlSearchBar extends LitElement {
     this._loading = true;
     this._timer = setTimeout(async () => {
       try {
+        // availability=readable forces OL to populate editions.docs via inner-hit
+        // query, so bestEdition() can return a readable edition link instead of
+        // falling back to the work URL.
         const p = new URLSearchParams({
-          q: this._q.trim(), limit: 5,
+          q: this._q.trim(), limit: 5, availability: 'readable',
           fields: 'key,title,author_name,cover_i,first_publish_year,ratings_average,ebook_access,editions.key,editions.cover_i,editions.ebook_access',
         });
         const d = await (await fetch(`/api/search?${p}`)).json();
@@ -329,13 +332,13 @@ export class OlSearchBar extends LitElement {
     .pf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
     .pf-fiction-sep { height:1px; background:hsl(0,0%,88%); }
 
-    /* Availability note link */
-    .pf-avail-note {
-      padding:6px 12px; font-size:11px; color:hsl(0,0%,52%);
-      border-top:1px solid hsl(0,0%,92%);
+    /* Availability item body — stacks label + sub vertically */
+    .pf-avail-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+    .pf-avail-sub {
+      font-size:11px; color:hsl(0,0%,55%); font-weight:normal; line-height:1.35;
     }
-    .pf-avail-note a { color:hsl(202,96%,37%); text-decoration:none; }
-    .pf-avail-note a:hover { text-decoration:underline; }
+    .pf-avail-sub a { color:hsl(202,96%,37%); text-decoration:none; }
+    .pf-avail-sub a:hover { text-decoration:underline; }
 
     .pf-item {
       display:flex; align-items:center; gap:8px;
@@ -466,16 +469,17 @@ export class OlSearchBar extends LitElement {
             <button class="pf-item ${f.availability === o.value ? 'selected' : ''}"
                     @click=${() => this._emitFilter('availability', o.value)}>
               <input type="radio" .checked=${f.availability === o.value} readonly>
-              ${o.label}
+              <span class="pf-avail-body">
+                <span>${o.label}</span>
+                <span class="pf-avail-sub">
+                  ${(o.subParts ?? []).map(p => p.href
+                    ? html`<a href=${p.href} target="_blank" rel="noopener"
+                               @click=${e => e.stopPropagation()}>${p.text}</a>`
+                    : p.text)}
+                </span>
+              </span>
               <span class="pf-count">${o.staticCount}</span>
             </button>`)}
-        </div>
-        <div class="pf-avail-note">
-          Includes
-          <a href="https://openlibrary.org/help/faq/borrow#how" target="_blank" rel="noopener"
-             @click=${e => e.stopPropagation()}>
-            digitized preserved physical books
-          </a>
         </div>
       </div>`;
     }

@@ -378,13 +378,13 @@ export class OlSearchPage extends LitElement {
     .rf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
     .rf-fiction-sep { height:1px; background:hsl(0,0%,88%); }
 
-    /* Availability note */
-    .rf-avail-note {
-      padding:6px 12px; font-size:11px; color:hsl(0,0%,52%);
-      border-top:1px solid hsl(0,0%,92%);
+    /* Availability item body — stacks label + sub vertically */
+    .rf-avail-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+    .rf-avail-sub {
+      font-size:11px; color:hsl(0,0%,55%); font-weight:normal; line-height:1.35;
     }
-    .rf-avail-note a { color:hsl(202,96%,37%); text-decoration:none; }
-    .rf-avail-note a:hover { text-decoration:underline; }
+    .rf-avail-sub a { color:hsl(202,96%,37%); text-decoration:none; }
+    .rf-avail-sub a:hover { text-decoration:underline; }
 
     .rf-item {
       display:flex; align-items:center; gap:8px;
@@ -485,16 +485,17 @@ export class OlSearchPage extends LitElement {
             <button class="rf-item ${this._availability === o.value ? 'selected' : ''}"
                     @click=${() => this._rfApply('availability', o.value)}>
               <input type="radio" .checked=${this._availability === o.value} readonly>
-              ${o.label}
+              <span class="rf-avail-body">
+                <span>${o.label}</span>
+                <span class="rf-avail-sub">
+                  ${(o.subParts ?? []).map(p => p.href
+                    ? html`<a href=${p.href} target="_blank" rel="noopener"
+                               @click=${e => e.stopPropagation()}>${p.text}</a>`
+                    : p.text)}
+                </span>
+              </span>
               <span class="rf-count-badge">${o.staticCount}</span>
             </button>`)}
-        </div>
-        <div class="rf-avail-note">
-          Includes
-          <a href="https://openlibrary.org/help/faq/borrow#how" target="_blank" rel="noopener"
-             @click=${e => e.stopPropagation()}>
-            digitized preserved physical books
-          </a>
         </div>
       </div>`;
     }
