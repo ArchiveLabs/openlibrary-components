@@ -508,7 +508,9 @@ export class OlSearchBar extends LitElement {
       const visible = GENRE_OPTIONS.filter(o =>
         !this._genreSearch || o.label.toLowerCase().includes(this._genreSearch.toLowerCase()));
       return html`<div class="${cls}">
-        <!-- Pinned Fiction / Nonfiction section -->
+        <input class="pf-search" placeholder="Search genres…" .value=${this._genreSearch}
+               @input=${e => { this._genreSearch = e.target.value; }}
+               @click=${e => e.stopPropagation()}>
         <div class="pf-fiction-section">
           ${FICTION_OPTIONS.map(o => html`
             <button class="pf-item ${f.fictionFilter === o.value ? 'selected' : ''}"
@@ -517,10 +519,6 @@ export class OlSearchBar extends LitElement {
             </button>`)}
         </div>
         <div class="pf-fiction-sep"></div>
-        <!-- Genre search + scrollable list -->
-        <input class="pf-search" placeholder="Search genres…" .value=${this._genreSearch}
-               @input=${e => { this._genreSearch = e.target.value; }}
-               @click=${e => e.stopPropagation()}>
         <div class="pf-drop-scroll">
           ${visible.length === 0 ? html`<div class="pf-empty">No genres found</div>` : ''}
           ${visible.map(o => {

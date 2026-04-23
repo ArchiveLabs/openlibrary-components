@@ -262,8 +262,8 @@ export class OlSearchPage extends LitElement {
     }
   }
 
-  _rfApply(filter, value) {
-    this._openFacet = null;
+  _rfApply(filter, value, keepOpen = false) {
+    if (!keepOpen) this._openFacet = null;
     switch (filter) {
       case 'sort':          this._sort          = value; break;
       case 'availability':  this._availability  = value; break;
@@ -524,25 +524,24 @@ export class OlSearchPage extends LitElement {
       const visible = GENRE_OPTIONS.filter(o =>
         !this._genreSearch || o.label.toLowerCase().includes(this._genreSearch.toLowerCase()));
       return html`<div class="${cls}">
-        <!-- Pinned Fiction / Nonfiction -->
+        <input class="rf-search" placeholder="Search genres…" .value=${this._genreSearch}
+               @input=${e => this._genreSearch = e.target.value}
+               @click=${e => e.stopPropagation()}>
         <div class="rf-fiction-section">
           ${FICTION_OPTIONS.map(o => html`
             <button class="rf-item ${this._fictionFilter === o.value ? 'selected' : ''}"
-                    @click=${() => this._rfApply('fictionFilter', this._fictionFilter === o.value ? '' : o.value)}>
+                    @click=${() => this._rfApply('fictionFilter', this._fictionFilter === o.value ? '' : o.value, true)}>
               <input type="checkbox" .checked=${this._fictionFilter === o.value} readonly>
               ${o.label}
             </button>`)}
         </div>
         <div class="rf-fiction-sep"></div>
-        <input class="rf-search" placeholder="Search genres…" .value=${this._genreSearch}
-               @input=${e => this._genreSearch = e.target.value}
-               @click=${e => e.stopPropagation()}>
         <div class="rf-drop-scroll">
           ${visible.length === 0 ? html`<div class="rf-empty">No genres found</div>` : ''}
           ${visible.map(o => {
             const checked = this._genres.includes(o.value);
             return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                @click=${() => this._rfApply('genres', toggleArrayValue(this._genres, o.value))}>
+                @click=${() => this._rfApply('genres', toggleArrayValue(this._genres, o.value), true)}>
               <input type="checkbox" .checked=${checked} readonly> ${o.label}
             </button>`;
           })}
