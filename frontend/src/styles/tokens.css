@@ -1,0 +1,69 @@
+/* Design tokens — minimal subset from openlibrary.org */
+:root {
+  /* Colors */
+  --primary-blue:   hsl(202, 96%, 37%);
+  --link-blue:      hsl(202, 96%, 28%);
+  --dark-blue:      hsl(210, 100%, 20%);
+  --dark-grey:      hsl(0, 0%, 20%);
+  --grey:           hsl(0, 0%, 40%);
+  --mid-grey:       hsl(0, 0%, 60%);
+  --light-grey:     hsl(0, 0%, 80%);
+  --lighter-grey:   hsl(0, 0%, 87%);
+  --white:          hsl(0, 0%, 100%);
+  --beige:          hsl(48, 33%, 83%);
+  --light-beige:    hsl(48, 29%, 93%);
+  --dark-beige:     hsl(64, 9%, 71%);
+  --header-grad-top:    hsl(41, 47%, 93%);
+  --header-grad-bot:    hsl(41, 48%, 89%);
+
+  /* Facet chip colors */
+  --chip-access-bg:   hsl(142, 50%, 91%);
+  --chip-access-text: hsl(142, 50%, 22%);
+  --chip-access-border: hsl(142, 50%, 72%);
+  --chip-lang-bg:     hsl(217, 70%, 92%);
+  --chip-lang-text:   hsl(217, 70%, 28%);
+  --chip-lang-border: hsl(217, 70%, 76%);
+  --chip-genre-bg:    hsl(270, 45%, 92%);
+  --chip-genre-text:  hsl(270, 45%, 30%);
+  --chip-genre-border:hsl(270, 45%, 76%);
+  --chip-author-bg:   hsl(25, 80%, 92%);
+  --chip-author-text: hsl(25, 80%, 28%);
+  --chip-author-border:hsl(25, 80%, 72%);
+
+  /* Badge colors for ebook access */
+  --badge-readable-bg:    hsl(142, 50%, 91%);
+  --badge-readable-text:  hsl(142, 50%, 22%);
+  --badge-borrowable-bg:  hsl(270, 45%, 92%);
+  --badge-borrowable-text:hsl(270, 45%, 30%);
+  --badge-open-bg:        hsl(217, 70%, 92%);
+  --badge-open-text:      hsl(217, 70%, 28%);
+  --badge-catalog-bg:     hsl(0, 0%, 92%);
+  --badge-catalog-text:   hsl(0, 0%, 35%);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --font-serif: Georgia, "Palatino Linotype", Palatino, serif;
+  --font-mono: "Lucida Console", "Courier New", monospace;
+
+  /* Spacing */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  0.75rem;
+  --space-lg:  1rem;
+  --space-xl:  1.5rem;
+  --space-2xl: 2rem;
+  --space-3xl: 3rem;
+
+  /* Radii */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-pill: 9999px;
+
+  /* Breakpoints (reference only) */
+  --bp-tablet:  768px;
+  --bp-desktop: 960px;
+
+  /* Layout */
+  --max-content: 1060px;
+}
