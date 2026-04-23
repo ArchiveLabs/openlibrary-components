@@ -10,8 +10,8 @@ export const SORT_OPTIONS = [
 ];
 
 export const AVAILABILITY_OPTIONS = [
-  { value: 'readable',   label: 'Readable Books Only', staticCount: '~4.6M', fraction: 0.092 },
   { value: '',           label: 'Full Card Catalog',   staticCount: '~50M',  fraction: 1.00 },
+  { value: 'readable',   label: 'Readable Books Only', staticCount: '~4.6M', fraction: 0.092 },
   { value: 'borrowable', label: 'Borrowable Only',     staticCount: '~2.7M', fraction: 0.054 },
   { value: 'open',       label: 'Open Access Only',    staticCount: '~1.8M', fraction: 0.036 },
 ];
