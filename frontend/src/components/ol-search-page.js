@@ -12,6 +12,21 @@ import {
 
 const LIMIT = 20;
 
+const SHOWCASE_BOOKS = [
+  { olid: 'OL27448W',   title: 'The Lord of the Rings',        href: 'https://openlibrary.org/works/OL27448W' },
+  { olid: 'OL1168007W', title: '1984',                         href: 'https://openlibrary.org/works/OL1168007W' },
+  { olid: 'OL66554W',   title: 'Pride and Prejudice',          href: 'https://openlibrary.org/works/OL66554W' },
+  { olid: 'OL59788W',   title: 'Dune',                         href: 'https://openlibrary.org/works/OL59788W' },
+  { olid: 'OL450907W',  title: 'To Kill a Mockingbird',        href: 'https://openlibrary.org/works/OL450907W' },
+  { olid: 'OL468431W',  title: 'The Great Gatsby',             href: 'https://openlibrary.org/works/OL468431W' },
+  { olid: 'OL80638W',   title: "The Hitchhiker's Guide",       href: 'https://openlibrary.org/works/OL80638W' },
+  { olid: 'OL893223W',  title: 'Brave New World',              href: 'https://openlibrary.org/works/OL893223W' },
+  { olid: 'OL76689W',   title: 'The Hobbit',                   href: 'https://openlibrary.org/works/OL76689W' },
+  { olid: 'OL483391W',  title: 'Crime and Punishment',         href: 'https://openlibrary.org/works/OL483391W' },
+  { olid: 'OL258596W',  title: 'Jane Eyre',                    href: 'https://openlibrary.org/works/OL258596W' },
+  { olid: 'OL262320W',  title: 'Don Quixote',                  href: 'https://openlibrary.org/works/OL262320W' },
+];
+
 // Module-level cache keyed by lowercase query string.
 const _facetsCache = new Map();
 
@@ -59,6 +74,7 @@ export class OlSearchPage extends LitElement {
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
     _hint:            { state: true },
+    _showcaseBooks:   { state: true },
   };
 
   constructor() {
@@ -90,19 +106,24 @@ export class OlSearchPage extends LitElement {
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
     this._hint            = null;
+    this._showcaseBooks   = shufflePick(SHOWCASE_BOOKS, 4);
     this._authorTimer     = null;
     this._subjectTimer    = null;
 
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) this._openFacet = null;
     };
-    this._globalSearch = e => this._onSearch(e);
+    this._globalSearch       = e => this._onSearch(e);
+    this._globalFilterChange = e => this._onFilterChange(e);
+    this._globalChipRemove   = e => this._onChipRemove(e);
   }
 
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('click', this._onDoc);
-    window.addEventListener('ol-search', this._globalSearch);
+    window.addEventListener('ol-search',        this._globalSearch);
+    window.addEventListener('ol-filter-change', this._globalFilterChange);
+    window.addEventListener('ol-chip-remove',   this._globalChipRemove);
     const q = new URLSearchParams(location.search).get('q');
     if (q) { this._lastQ = q; this._runSearch(1); }
   }
@@ -110,7 +131,18 @@ export class OlSearchPage extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
-    window.removeEventListener('ol-search', this._globalSearch);
+    window.removeEventListener('ol-search',        this._globalSearch);
+    window.removeEventListener('ol-filter-change', this._globalFilterChange);
+    window.removeEventListener('ol-chip-remove',   this._globalChipRemove);
+  }
+
+  updated(changed) {
+    const broadcast = ['_lastQ', '_sort', '_availability', '_fictionFilter', '_languages', '_genres', '_authors', '_subjects'];
+    if (broadcast.some(k => changed.has(k))) {
+      window.dispatchEvent(new CustomEvent('ol-app-state', {
+        detail: { hasQuery: this._lastQ !== null, filters: this._filters, chips: this._chips },
+      }));
+    }
   }
 
   // ── Computed helpers ──────────────────────────────────────────
@@ -300,11 +332,17 @@ export class OlSearchPage extends LitElement {
   static styles = css`
     :host { display:block; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 
-    /* Hero */
-    .hero { text-align:center; padding:60px 16px 40px; }
-    .hero h1 { font-family:Georgia,serif; font-size:30px; color:hsl(202,96%,28%); margin:0 0 8px; }
-    .hero p  { color:hsl(0,0%,45%); margin:0 0 32px; font-size:15px; }
-    .hero .sw { max-width:640px; margin:0 auto; }
+    /* Homepage book cover showcase */
+    .cover-grid {
+      display:flex; gap:24px; justify-content:center; align-items:flex-end;
+      padding:80px 20px 70px;
+    }
+    .cover-item { text-decoration:none; transition:transform .2s; }
+    .cover-item:hover { transform:translateY(-8px) rotate(1.5deg); }
+    .cover-item img {
+      display:block; width:100px; height:150px; object-fit:cover;
+      border-radius:4px; box-shadow:3px 5px 16px rgba(0,0,0,.3);
+    }
 
     /* Results layout */
     .results-wrap { display:flex; flex-direction:column; gap:8px; }
@@ -659,19 +697,12 @@ export class OlSearchPage extends LitElement {
 
     if (!hasQuery) {
       return html`
-        <div class="hero">
-          <h1>Find your next book</h1>
-          <p>Search 25+ million books from the Open Library catalog.</p>
-          <div class="sw">
-            <ol-search-bar
-              .showFacets=${true}
-              .filters=${this._filters}
-              .chips=${this._chips}
-              @ol-search=${this._onSearch}
-              @ol-filter-change=${this._onFilterChange}
-              @ol-chip-remove=${this._onChipRemove}
-            ></ol-search-bar>
-          </div>
+        <div class="cover-grid">
+          ${this._showcaseBooks.map(b => html`
+            <a class="cover-item" href=${b.href} target="_blank" rel="noopener" title=${b.title}>
+              <img src="https://covers.openlibrary.org/b/olid/${b.olid}-M.jpg"
+                   alt=${b.title} loading="lazy">
+            </a>`)}
         </div>`;
     }
 
@@ -680,8 +711,6 @@ export class OlSearchPage extends LitElement {
         <ol-search-bar
           .q=${this._lastQ ?? ''}
           .chips=${this._chips}
-          @ol-search=${this._onSearch}
-          @ol-chip-remove=${this._onChipRemove}
         ></ol-search-bar>
 
         <div class="results-body">

@@ -1,26 +1,42 @@
 import { LitElement, html, css } from 'lit';
+import { EMPTY_FILTERS, buildChips } from '../utils/filters.js';
+import './ol-search-bar.js';
 
 export class OlHeader extends LitElement {
   static properties = {
     _browseOpen: { state: true },
+    _mode:       { state: true },   // 'home' | 'search'
+    _filters:    { state: true },
+    _chips:      { state: true },
   };
 
   constructor() {
     super();
     this._browseOpen = false;
+    this._mode    = 'home';
+    this._filters = EMPTY_FILTERS;
+    this._chips   = buildChips(EMPTY_FILTERS);
+
     this._onDocClick = (e) => {
       if (!e.composedPath().includes(this)) this._browseOpen = false;
+    };
+    this._onAppState = (e) => {
+      this._mode    = e.detail.hasQuery ? 'search' : 'home';
+      this._filters = e.detail.filters ?? EMPTY_FILTERS;
+      this._chips   = e.detail.chips   ?? [];
     };
   }
 
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('click', this._onDocClick);
+    window.addEventListener('ol-app-state', this._onAppState);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDocClick);
+    window.removeEventListener('ol-app-state', this._onAppState);
   }
 
   static styles = css`
@@ -34,6 +50,7 @@ export class OlHeader extends LitElement {
       position: sticky;
       top: 0;
       z-index: 50;
+      overflow: visible;
     }
     .bar {
       max-width: 1060px;
@@ -97,51 +114,21 @@ export class OlHeader extends LitElement {
       border-radius: 0;
       font-weight: 400;
       font-size: 13px;
+      color: hsl(0, 0%, 22%);
+      text-decoration: none;
     }
     .browse-menu a:hover { background: white; }
 
-    /* Search */
-    .search-wrap { flex: 1; min-width: 160px; max-width: 480px; margin: 0 8px; }
-    .search-form {
-      display: flex;
-      align-items: center;
-      background: hsl(0, 0%, 98%);
-      border: 1px solid hsl(64, 9%, 71%);
-      border-radius: 6px;
-      overflow: hidden;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .search-form:focus-within {
-      border-color: hsl(202, 96%, 37%);
-      box-shadow: 0 0 0 3px hsla(202, 96%, 37%, 0.12);
-    }
-    .search-form input {
+    /* Search area — grows to fill space, constrained to reasonable max */
+    .search-wrap {
       flex: 1;
-      border: none;
-      background: none;
-      padding: 7px 10px;
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-      color: hsl(0, 0%, 18%);
-      min-width: 0;
+      min-width: 160px;
+      max-width: 640px;
+      margin: 0 8px;
     }
-    .search-form input::placeholder { color: hsl(0, 0%, 55%); }
-    .search-btn {
-      padding: 7px 10px;
-      border: none;
-      border-left: 1px solid hsl(0, 0%, 88%);
-      background: none;
-      cursor: pointer;
-      color: hsl(0, 0%, 45%);
-      display: flex;
-      align-items: center;
-      transition: background 0.12s;
-    }
-    .search-btn:hover { background: rgba(0, 0, 0, 0.04); color: hsl(202, 96%, 37%); }
 
     /* Auth */
-    .auth { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+    .auth { display: flex; align-items: center; gap: 6px; margin-left: 4px; flex-shrink: 0; }
     .btn-login {
       font-size: 13px;
       padding: 5px 13px;
@@ -171,13 +158,6 @@ export class OlHeader extends LitElement {
     }
     .btn-signup:hover { background: hsl(202, 96%, 28%); }
   `;
-
-  _submitSearch(e) {
-    e.preventDefault();
-    const q = this.shadowRoot.querySelector('.search-input').value.trim();
-    if (!q) return;
-    window.dispatchEvent(new CustomEvent('ol-search', { detail: { q } }));
-  }
 
   render() {
     return html`
@@ -213,21 +193,15 @@ export class OlHeader extends LitElement {
             </div>
           </nav>
 
-          <div class="search-wrap">
-            <form class="search-form" @submit=${this._submitSearch}>
-              <input
-                class="search-input"
-                type="search"
-                placeholder="Search books, authors…"
-                autocomplete="off"
-              >
-              <button type="submit" class="search-btn" aria-label="Search">
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-                </svg>
-              </button>
-            </form>
-          </div>
+          ${this._mode === 'home' ? html`
+            <div class="search-wrap">
+              <ol-search-bar
+                .showFacets=${true}
+                .filters=${this._filters}
+                .chips=${this._chips}
+              ></ol-search-bar>
+            </div>
+          ` : ''}
 
           <div class="auth">
             <a href="/account/login" class="btn-login">Log In</a>

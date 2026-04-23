@@ -236,6 +236,11 @@ export class OlSearchBar extends LitElement {
     }
     .text-input::placeholder { color:hsl(0,0%,52%); }
 
+    /* Input + submit + scanner grouped so they never split across lines */
+    .input-controls {
+      display:flex; align-items:center; flex:1; min-width:160px; gap:5px;
+    }
+
     /* Submit button */
     .submit {
       flex-shrink:0; margin-left:auto;
@@ -639,26 +644,28 @@ export class OlSearchBar extends LitElement {
             <button class="chip-x" @click=${() => this._removeChip(c.type, c.value)}>×</button>
           </span>`)}
 
-        <input class="text-input" type="search" autocomplete="off"
-               placeholder="Search books, authors…" .value=${this._q}
-               @focus=${this._onFocus}
-               @input=${this._onInput}
-               @keydown=${this._onKeyDown}>
+        <div class="input-controls">
+          <input class="text-input" type="search" autocomplete="off"
+                 placeholder="Search books, authors…" .value=${this._q}
+                 @focus=${this._onFocus}
+                 @input=${this._onInput}
+                 @keydown=${this._onKeyDown}>
 
-        <button class="submit" @click=${this._submit}>
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          Search
-        </button>
-        <span class="scan-sep"></span>
-        <a class="scan-btn" title="Scan ISBN barcode"
-           href="https://openlibrary.org/barcodescanner?returnTo=/isbn/$$$"
-           target="_blank" rel="noopener"
-           @click=${e => e.stopPropagation()}>
-          <img src="https://openlibrary.org/static/images/icons/barcode_scanner.svg"
-               alt="Scan barcode" width="18" height="18">
-        </a>
+          <button class="submit" @click=${this._submit}>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
+            Search
+          </button>
+          <span class="scan-sep"></span>
+          <a class="scan-btn" title="Scan ISBN barcode"
+             href="https://openlibrary.org/barcodescanner?returnTo=/isbn/$$$"
+             target="_blank" rel="noopener"
+             @click=${e => e.stopPropagation()}>
+            <img src="https://openlibrary.org/static/images/icons/barcode_scanner.svg"
+                 alt="Scan barcode" width="18" height="18">
+          </a>
+        </div>
       </div>
 
       ${this._open ? html`
