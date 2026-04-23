@@ -1,110 +1,81 @@
 import { LitElement, html, css } from 'lit';
+import {
+  SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
+  FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
+  EMPTY_FILTERS, toggleArrayValue, shufflePick,
+  getLangLabel, getAvailabilityLabel, getSortLabel,
+} from '../utils/filters.js';
+import './ol-howto-modal.js';
 
-// ── Module-level facets cache (keyed by query string) ─────────────────────────
-const _facetsCache = new Map();
-
-async function loadFacets(q) {
-  const key = (q || '').trim().toLowerCase();
-  if (!key) return {};
-  if (_facetsCache.has(key)) return _facetsCache.get(key);
-  try {
-    const resp = await fetch(`/api/search/facets?q=${encodeURIComponent(q)}`);
-    const data = await resp.json();
-    const facets = data?.sidebar?.searchFacets?.facets ?? {};
-    _facetsCache.set(key, facets);
-    return facets;
-  } catch {
-    _facetsCache.set(key, {});
-    return {};
-  }
-}
-
-// ── Static data ───────────────────────────────────────────────────────────────
-const SORT_OPTIONS = [
-  { value: '',           label: 'Relevance' },
-  { value: 'editions',   label: 'Most Editions' },
-  { value: 'old',        label: 'First Published' },
-  { value: 'new',        label: 'Most Recent' },
-  { value: 'rating',     label: 'Top Rated' },
-  { value: 'readinglog', label: 'Reading Log' },
-  { value: 'trending',   label: 'Trending' },
-  { value: 'random',     label: 'Random' },
-];
-
-const ACCESS_OPTIONS = [
-  { value: 'no_ebook',      label: 'Catalog',    desc: 'In catalog only' },
-  { value: 'public',        label: 'Readable',   desc: 'Free to read online' },
-  { value: 'printdisabled', label: 'Open',       desc: 'Print-disabled access' },
-  { value: 'borrowable',    label: 'Borrowable', desc: 'Borrow from digital library' },
-];
-
-const LANGUAGES = [
-  { code: 'eng', label: 'English' },   { code: 'spa', label: 'Spanish' },
-  { code: 'fre', label: 'French' },    { code: 'ger', label: 'German' },
-  { code: 'ita', label: 'Italian' },   { code: 'por', label: 'Portuguese' },
-  { code: 'pol', label: 'Polish' },    { code: 'rus', label: 'Russian' },
-  { code: 'chi', label: 'Chinese' },   { code: 'jpn', label: 'Japanese' },
-  { code: 'ara', label: 'Arabic' },    { code: 'dut', label: 'Dutch' },
-  { code: 'swe', label: 'Swedish' },   { code: 'nor', label: 'Norwegian' },
-  { code: 'dan', label: 'Danish' },    { code: 'fin', label: 'Finnish' },
-  { code: 'tur', label: 'Turkish' },   { code: 'kor', label: 'Korean' },
-  { code: 'heb', label: 'Hebrew' },    { code: 'lat', label: 'Latin' },
-];
-
-const GENRES = [
-  'Action','Adventure','Comedy','Crime','Drama','Erotica',
-  'Fantasy','Historical','Horror','Humor','LGBTQ+','Literary',
-  'Mystery','Mythology','Romance','Satire','Science Fiction',
-  'Thriller','Tragedy','Western',
-];
-
-// ── Component ─────────────────────────────────────────────────────────────────
+/**
+ * Search input + chip pills + autocomplete panel.
+ *
+ * Props:
+ *   q          — controlled query string
+ *   chips      — { type, label, value }[]  rendered as colored pills
+ *   showFacets — when true, renders a facet filter row inside the open panel
+ *   filters    — current filter state object (only read when showFacets=true)
+ *
+ * Events (bubbles + composed):
+ *   ol-search        — { q }
+ *   ol-chip-remove   — { type, value }
+ *   ol-filter-change — { filter, value }  (only when showFacets=true)
+ */
 export class OlSearchBar extends LitElement {
   static properties = {
-    facetQ:   { type: String, attribute: 'facet-q' },
-    initialQ: { type: String, attribute: 'initial-q' },
+    q:          { type: String },
+    chips:      { type: Array },
+    showFacets: { type: Boolean },
+    filters:    { type: Object },
+
     _q:               { state: true },
-    _sort:            { state: true },
-    _access:          { state: true },
-    _language:        { state: true },
-    _genres:          { state: true },
-    _author:          { state: true },
-    _subjects:        { state: true },
+    _suggestions:     { state: true },
+    _open:            { state: true },
+    _loading:         { state: true },
+    _total:           { state: true },
+    // facet panel state (only active when showFacets=true)
     _openFacet:       { state: true },
+    _howtoOpen:       { state: true },
     _langSearch:      { state: true },
     _genreSearch:     { state: true },
     _authorSearch:    { state: true },
-    _subjectSearch:   { state: true },
     _authorResults:   { state: true },
+    _subjectSearch:   { state: true },
     _subjectResults:  { state: true },
-    _facetData:       { state: true },
-    _facetsLoading:   { state: true },
+    _defaultAuthors:  { state: true },
+    _defaultSubjects: { state: true },
   };
 
   constructor() {
     super();
-    this.facetQ   = '';
-    this.initialQ = '';
+    this.q          = '';
+    this.chips      = [];
+    this.showFacets = false;
+    this.filters    = { ...EMPTY_FILTERS };
+
     this._q             = '';
-    this._sort          = '';
-    this._access        = null;
-    this._language      = null;
-    this._genres        = [];
-    this._author        = null;
-    this._subjects      = [];
-    this._openFacet     = null;
-    this._langSearch    = '';
-    this._genreSearch   = '';
-    this._authorSearch  = '';
-    this._subjectSearch = '';
+    this._suggestions   = [];
+    this._open          = false;
+    this._loading       = false;
+    this._total         = 0;
+    this._timer         = null;
+
+    this._openFacet      = null;
+    this._howtoOpen      = false;
+    this._langSearch     = '';
+    this._genreSearch    = '';
+    this._authorSearch   = '';
     this._authorResults  = [];
+    this._subjectSearch  = '';
     this._subjectResults = [];
-    this._facetData      = null;
-    this._facetsLoading  = false;
+    this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
+    this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
     this._authorTimer    = null;
     this._subjectTimer   = null;
-    this._onDocClick = (e) => {
-      if (!e.composedPath().some(el => el?.classList?.contains('fw'))) {
+
+    this._onDoc = e => {
+      if (!e.composedPath().includes(this)) {
+        this._open = false;
         this._openFacet = null;
       }
     };
@@ -112,583 +83,624 @@ export class OlSearchBar extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('click', this._onDocClick);
-    if (this.initialQ) this._q = this.initialQ;
+    document.addEventListener('click', this._onDoc);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('click', this._onDocClick);
+    document.removeEventListener('click', this._onDoc);
   }
 
   updated(changed) {
-    if (changed.has('facetQ') && this.facetQ !== changed.get('facetQ')) {
-      this._facetData = null; // invalidate suggestions on new query
+    if (changed.has('q') && this.q != null && this.q !== this._q) {
+      this._q = this.q;
     }
   }
 
-  // ── Emit ───────────────────────────────────────────────────────
-  _emit() {
+  // ── Autocomplete ──────────────────────────────────────────────
+  _onFocus() { this._open = true; }
+
+  _onInput(e) {
+    this._q = e.target.value;
+    this._open = true;
+    clearTimeout(this._timer);
+    if (this._q.trim().length < 2) {
+      this._suggestions = [];
+      this._loading = false;
+      return;
+    }
+    this._loading = true;
+    this._timer = setTimeout(async () => {
+      try {
+        const p = new URLSearchParams({
+          q: this._q.trim(), limit: 5,
+          fields: 'key,title,author_name,cover_i,first_publish_year,ratings_average,ebook_access',
+        });
+        const d = await (await fetch(`/api/search?${p}`)).json();
+        this._suggestions = d.docs ?? [];
+        this._total       = d.num_found ?? 0;
+      } catch {
+        this._suggestions = []; this._total = 0;
+      } finally {
+        this._loading = false;
+      }
+    }, 300);
+  }
+
+  _onKeyDown(e) {
+    if (e.key === 'Escape') { this._open = false; this._openFacet = null; return; }
+    if (e.key === 'Enter')  this._submit();
+  }
+
+  _submit() {
+    this._open = false;
+    this._openFacet = null;
+    if (!this._q.trim()) return;
     this.dispatchEvent(new CustomEvent('ol-search', {
-      detail: {
-        q:            this._q,
-        sort:         this._sort || undefined,
-        ebook_access: this._access,
-        language:     this._language?.code ?? null,
-        subjects:     [...this._genres, ...this._subjects],
-        author:       this._author,
-      },
-      bubbles: true,
-      composed: true,
+      detail: { q: this._q.trim() }, bubbles: true, composed: true,
     }));
   }
 
-  // ── Facet panel open/close ─────────────────────────────────────
-  async _toggle(name) {
-    if (this._openFacet === name) { this._openFacet = null; return; }
-    this._openFacet = name;
-    if ((name === 'author' || name === 'subject') && !this._facetData) {
-      const q = this.facetQ || this._q;
-      if (q) {
-        this._facetsLoading = true;
-        this._facetData = await loadFacets(q);
-        this._facetsLoading = false;
-      }
-    }
+  _removeChip(type, value) {
+    this.dispatchEvent(new CustomEvent('ol-chip-remove', {
+      detail: { type, value }, bubbles: true, composed: true,
+    }));
   }
 
-  // ── Filter setters ─────────────────────────────────────────────
-  _setSort(val) {
-    this._sort = val;
+  // ── Facets ────────────────────────────────────────────────────
+  _emitFilter(filter, value) {
+    this.dispatchEvent(new CustomEvent('ol-filter-change', {
+      detail: { filter, value }, bubbles: true, composed: true,
+    }));
     this._openFacet = null;
-    this._emit();
   }
 
-  _setAccess(val) {
-    this._access = this._access === val ? null : val;
-    this._openFacet = null;
-    this._emit();
+  _toggleFacet(name, e) {
+    e.stopPropagation();
+    this._openFacet = this._openFacet === name ? null : name;
   }
 
-  _setLanguage(lang) {
-    this._language = this._language?.code === lang.code ? null : lang;
-    this._openFacet = null;
-    this._emit();
-  }
-
-  _toggleGenre(g) {
-    this._genres = this._genres.includes(g)
-      ? this._genres.filter(x => x !== g)
-      : [...this._genres, g];
-    this._emit();
-  }
-
-  _setAuthor(name) {
-    this._author = name || null;
-    this._authorSearch = name || '';
-    this._openFacet = null;
-    this._emit();
-  }
-
-  _toggleSubject(s) {
-    this._subjects = this._subjects.includes(s)
-      ? this._subjects.filter(x => x !== s)
-      : [...this._subjects, s];
-    this._emit();
-  }
-
-  _clearFilter(type) {
-    if (type === 'sort')     this._sort     = '';
-    if (type === 'access')   this._access   = null;
-    if (type === 'language') this._language = null;
-    if (type === 'genre')    this._genres   = [];
-    if (type === 'author')   { this._author = null; this._authorSearch = ''; this._authorResults = []; }
-    if (type === 'subject')  { this._subjects = []; this._subjectSearch = ''; this._subjectResults = []; }
-    this._emit();
-  }
-
-  // ── Debounced remote searches ──────────────────────────────────
-  _onAuthorInput(e) {
+  _onAuthorSearch(e) {
     this._authorSearch = e.target.value;
     clearTimeout(this._authorTimer);
-    if (!this._authorSearch.trim()) { this._authorResults = []; return; }
+    if (this._authorSearch.trim().length < 2) { this._authorResults = []; return; }
     this._authorTimer = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/authors/search?q=${encodeURIComponent(this._authorSearch)}&limit=8`);
-        const d = await r.json();
-        this._authorResults = d.docs ?? [];
-      } catch { this._authorResults = []; }
+      const d = await (await fetch(`/api/authors/search?q=${encodeURIComponent(this._authorSearch.trim())}&limit=8`)).json();
+      this._authorResults = d.docs ?? [];
     }, 250);
   }
 
-  _onSubjectInput(e) {
+  _onSubjectSearch(e) {
     this._subjectSearch = e.target.value;
     clearTimeout(this._subjectTimer);
-    if (!this._subjectSearch.trim()) { this._subjectResults = []; return; }
+    if (this._subjectSearch.trim().length < 2) { this._subjectResults = []; return; }
     this._subjectTimer = setTimeout(async () => {
-      try {
-        const r = await fetch(`/api/subjects/search?q=${encodeURIComponent(this._subjectSearch)}&limit=8`);
-        const d = await r.json();
-        this._subjectResults = d.docs ?? [];
-      } catch { this._subjectResults = []; }
+      const d = await (await fetch(`/api/subjects/search?q=${encodeURIComponent(this._subjectSearch.trim())}&limit=8`)).json();
+      this._subjectResults = d.docs ?? [];
     }, 250);
-  }
-
-  // ── Chips ──────────────────────────────────────────────────────
-  _chips() {
-    const out = [];
-    if (this._access) {
-      const opt = ACCESS_OPTIONS.find(a => a.value === this._access);
-      out.push(html`<span class="chip chip-access">access:${opt?.label ?? this._access}
-        <button class="chip-x" @click=${() => this._clearFilter('access')}>×</button></span>`);
-    }
-    if (this._language) {
-      out.push(html`<span class="chip chip-lang">lang:${this._language.label}
-        <button class="chip-x" @click=${() => this._clearFilter('language')}>×</button></span>`);
-    }
-    for (const g of this._genres) {
-      out.push(html`<span class="chip chip-genre">genre:${g}
-        <button class="chip-x" @click=${() => this._toggleGenre(g)}>×</button></span>`);
-    }
-    if (this._author) {
-      out.push(html`<span class="chip chip-author">author:${this._author}
-        <button class="chip-x" @click=${() => this._clearFilter('author')}>×</button></span>`);
-    }
-    for (const s of this._subjects) {
-      out.push(html`<span class="chip chip-subject">subject:${s}
-        <button class="chip-x" @click=${() => this._toggleSubject(s)}>×</button></span>`);
-    }
-    return out;
-  }
-
-  // ── Facet button label helpers ─────────────────────────────────
-  _btnLabel(staticLabel, value) {
-    if (!value) return html`${staticLabel} <span class="chv">▾</span>`;
-    return html`
-      <span class="bl">${staticLabel}</span>
-      <span class="bsep">|</span>
-      <span class="bv">${value}</span>
-      <span class="chv">▾</span>`;
-  }
-
-  // ── Dropdown panels ────────────────────────────────────────────
-  _sortPanel() {
-    const cur = SORT_OPTIONS.find(o => o.value === this._sort) ?? SORT_OPTIONS[0];
-    return html`
-      <div class="dd">
-        <div class="dd-list">
-          ${SORT_OPTIONS.map(opt => html`
-            <button class="dd-item ${this._sort === opt.value ? 'sel' : ''}"
-                    @click=${() => this._setSort(opt.value)}>
-              ${opt.label}
-              ${this._sort === opt.value ? html`<span class="dd-check">✓</span>` : ''}
-            </button>`)}
-        </div>
-      </div>`;
-  }
-
-  _accessPanel() {
-    return html`
-      <div class="dd">
-        <div class="dd-list">
-          ${ACCESS_OPTIONS.map(opt => html`
-            <label class="dd-item ${this._access === opt.value ? 'sel' : ''}">
-              <input type="radio" name="access" .checked=${this._access === opt.value}
-                     @change=${() => this._setAccess(opt.value)}>
-              <span>${opt.label}<small class="dd-meta"> — ${opt.desc}</small></span>
-            </label>`)}
-        </div>
-        ${this._access ? html`<div class="dd-foot">
-          <button class="dd-clear" @click=${() => this._setAccess(null)}>Clear</button>
-        </div>` : ''}
-      </div>`;
-  }
-
-  _languagePanel() {
-    const list = LANGUAGES.filter(l =>
-      l.label.toLowerCase().includes(this._langSearch.toLowerCase()));
-    return html`
-      <div class="dd">
-        <div class="dd-srch">
-          <input type="text" placeholder="Search languages…"
-                 .value=${this._langSearch}
-                 @input=${e => this._langSearch = e.target.value}>
-        </div>
-        <div class="dd-list">
-          ${list.map(lang => html`
-            <label class="dd-item ${this._language?.code === lang.code ? 'sel' : ''}">
-              <input type="radio" name="lang" .checked=${this._language?.code === lang.code}
-                     @change=${() => this._setLanguage(lang)}>
-              ${lang.label}
-            </label>`)}
-        </div>
-        ${this._language ? html`<div class="dd-foot">
-          <button class="dd-clear" @click=${() => this._clearFilter('language')}>Clear</button>
-        </div>` : ''}
-      </div>`;
-  }
-
-  _genrePanel() {
-    const list = GENRES.filter(g =>
-      g.toLowerCase().includes(this._genreSearch.toLowerCase()));
-    return html`
-      <div class="dd">
-        <div class="dd-srch">
-          <input type="text" placeholder="Search genres…"
-                 .value=${this._genreSearch}
-                 @input=${e => this._genreSearch = e.target.value}>
-        </div>
-        <div class="dd-list">
-          ${list.map(genre => html`
-            <label class="dd-item ${this._genres.includes(genre) ? 'sel' : ''}">
-              <input type="checkbox" .checked=${this._genres.includes(genre)}
-                     @change=${() => this._toggleGenre(genre)}>
-              ${genre}
-            </label>`)}
-        </div>
-        ${this._genres.length ? html`<div class="dd-foot">
-          <button class="dd-clear" @click=${() => { this._genres = []; this._emit(); }}>Clear all</button>
-        </div>` : ''}
-      </div>`;
-  }
-
-  _authorPanel() {
-    const suggested = this._facetData?.author_key ?? [];
-    const showSearch = this._authorSearch.length > 0;
-    const displayList = showSearch ? this._authorResults : suggested;
-    return html`
-      <div class="dd wide">
-        <div class="dd-srch">
-          <input type="text" placeholder="Search authors…" autofocus
-                 .value=${this._authorSearch}
-                 @input=${this._onAuthorInput}
-                 @keydown=${e => e.key === 'Enter' && this._setAuthor(this._authorSearch)}>
-        </div>
-        <div class="dd-list">
-          ${this._facetsLoading ? html`<div class="dd-hint">Loading suggestions…</div>` : ''}
-          ${!this._facetsLoading && !showSearch && suggested.length === 0 && !this._author
-            ? html`<div class="dd-hint">Type a name to search authors</div>` : ''}
-          ${!this._facetsLoading && !showSearch && suggested.length > 0
-            ? html`<div class="dd-group-label">Suggested for this search</div>` : ''}
-          ${displayList.map(a => {
-            const name = a.name ?? a.author_name ?? '';
-            const count = a.count ?? a.work_count ?? null;
-            return html`
-              <button class="dd-item ${this._author === name ? 'sel' : ''}"
-                      @click=${() => this._setAuthor(name)}>
-                <span class="dd-item-main">${name}</span>
-                ${count ? html`<span class="dd-count">${count.toLocaleString()} works</span>` : ''}
-                ${this._author === name ? html`<span class="dd-check">✓</span>` : ''}
-              </button>`; })}
-        </div>
-        ${this._author ? html`<div class="dd-foot">
-          <button class="dd-clear" @click=${() => this._clearFilter('author')}>Clear</button>
-        </div>` : ''}
-      </div>`;
-  }
-
-  _subjectPanel() {
-    const suggested = this._facetData?.subject_facet ?? [];
-    const showSearch = this._subjectSearch.length > 0;
-    const displayList = showSearch ? this._subjectResults : suggested;
-    return html`
-      <div class="dd wide">
-        <div class="dd-srch">
-          <input type="text" placeholder="Search subjects…"
-                 .value=${this._subjectSearch}
-                 @input=${this._onSubjectInput}>
-        </div>
-        <div class="dd-list">
-          ${this._facetsLoading ? html`<div class="dd-hint">Loading suggestions…</div>` : ''}
-          ${!this._facetsLoading && !showSearch && suggested.length === 0 && this._subjects.length === 0
-            ? html`<div class="dd-hint">Type to search subjects</div>` : ''}
-          ${!this._facetsLoading && !showSearch && suggested.length > 0
-            ? html`<div class="dd-group-label">Suggested for this search</div>` : ''}
-          ${displayList.map(s => {
-            const name = s.subject ?? s.name ?? '';
-            const count = s.count ?? s.work_count ?? null;
-            const sel = this._subjects.includes(name);
-            return html`
-              <label class="dd-item ${sel ? 'sel' : ''}">
-                <input type="checkbox" .checked=${sel} @change=${() => this._toggleSubject(name)}>
-                <span class="dd-item-main">${name}</span>
-                ${count ? html`<span class="dd-count">${count.toLocaleString()}</span>` : ''}
-              </label>`; })}
-          ${showSearch && this._subjectResults.length === 0
-            ? html`<div class="dd-hint">No subjects found</div>` : ''}
-        </div>
-        ${this._subjects.length ? html`<div class="dd-foot">
-          <button class="dd-clear" @click=${() => { this._subjects = []; this._emit(); }}>Clear all</button>
-        </div>` : ''}
-      </div>`;
   }
 
   // ── Styles ─────────────────────────────────────────────────────
   static styles = css`
-    :host {
-      display: block;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
+    :host { display: block; position: relative; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
-    /* ── Search input row ──────────────────────────────────────── */
+    /* Input row */
     .input-row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 5px;
-      background: white;
-      border: 1.5px solid hsl(0, 0%, 78%);
-      border-radius: 8px;
-      padding: 6px 8px;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+      background: white; border: 1.5px solid hsl(0,0%,78%); border-radius: 8px;
+      padding: 6px 8px; transition: border-color .15s, box-shadow .15s, border-radius .12s;
+      position: relative; z-index: 10;
     }
     .input-row:focus-within {
-      border-color: hsl(202, 96%, 37%);
-      box-shadow: 0 0 0 3px hsla(202, 96%, 37%, 0.12);
+      border-color: hsl(202,96%,37%);
+      box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
+    }
+    .input-row.panel-open {
+      border-radius: 8px 8px 0 0;
+      border-color: hsl(202,96%,37%);
+      border-bottom-color: hsl(0,0%,90%);
+      box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
+    }
+    .input-row.panel-open:focus-within {
+      border-color: hsl(202,96%,37%);
+      border-bottom-color: hsl(0,0%,90%);
+      box-shadow: 0 0 0 3px hsla(202,96%,37%,.12);
     }
 
-    /* ── Chips ─────────────────────────────────────────────────── */
+    /* Chips */
     .chip {
       display: inline-flex; align-items: center; gap: 3px;
       padding: 2px 7px 2px 9px; border-radius: 9999px;
-      font-size: 12px; font-weight: 500; border: 1px solid;
-      white-space: nowrap; line-height: 1.5;
+      font-size: 12px; font-weight: 500; border: 1px solid; white-space: nowrap; line-height: 1.5;
     }
-    .chip-access  { background: hsl(142,50%,91%); color: hsl(142,50%,22%); border-color: hsl(142,50%,72%); }
-    .chip-lang    { background: hsl(217,70%,92%); color: hsl(217,70%,28%); border-color: hsl(217,70%,76%); }
-    .chip-genre   { background: hsl(270,45%,92%); color: hsl(270,45%,30%); border-color: hsl(270,45%,76%); }
-    .chip-author  { background: hsl(25,80%,92%);  color: hsl(25,80%,28%);  border-color: hsl(25,80%,72%);  }
-    .chip-subject { background: hsl(340,60%,92%); color: hsl(340,60%,28%); border-color: hsl(340,60%,76%); }
+    .chip-access   { background:hsl(142,50%,91%); color:hsl(142,50%,22%); border-color:hsl(142,50%,72%); }
+    .chip-fiction  { background:hsl(270,45%,92%); color:hsl(270,45%,30%); border-color:hsl(270,45%,76%); }
+    .chip-lang     { background:hsl(217,70%,92%); color:hsl(217,70%,28%); border-color:hsl(217,70%,76%); }
+    .chip-genre    { background:hsl(270,35%,93%); color:hsl(270,35%,32%); border-color:hsl(270,35%,78%); }
+    .chip-author   { background:hsl(25,80%,92%);  color:hsl(25,80%,28%);  border-color:hsl(25,80%,72%); }
+    .chip-subject  { background:hsl(340,60%,92%); color:hsl(340,60%,28%); border-color:hsl(340,60%,76%); }
     .chip-x {
-      background: none; border: none; cursor: pointer;
-      padding: 0 1px; font-size: 15px; line-height: 1; opacity: 0.5;
+      background:none; border:none; cursor:pointer;
+      padding:0 1px; font-size:15px; line-height:1; opacity:.5;
     }
-    .chip-x:hover { opacity: 1; }
+    .chip-x:hover { opacity:1; }
 
-    /* ── Text input ────────────────────────────────────────────── */
+    /* Text input */
     .text-input {
-      flex: 1; min-width: 120px; border: none; outline: none;
-      font-size: 14px; font-family: inherit; color: hsl(0,0%,15%);
-      background: transparent; padding: 2px 4px;
+      flex:1; min-width:120px; border:none; outline:none;
+      font-size:14px; font-family:inherit; color:hsl(0,0%,15%);
+      background:transparent; padding:2px 4px;
     }
-    .text-input::placeholder { color: hsl(0,0%,52%); }
+    .text-input::placeholder { color:hsl(0,0%,52%); }
 
-    /* ── Submit button ─────────────────────────────────────────── */
+    /* Submit button */
     .submit {
-      flex-shrink: 0; margin-left: auto;
-      background: hsl(202,96%,37%); color: white;
-      border: none; border-radius: 6px; padding: 6px 14px;
-      font-size: 13px; font-weight: 500; font-family: inherit;
-      cursor: pointer; display: inline-flex; align-items: center;
-      gap: 5px; white-space: nowrap; transition: background 0.12s;
+      flex-shrink:0; margin-left:auto;
+      background:hsl(202,96%,37%); color:white; border:none;
+      border-radius:6px; padding:6px 14px; font-size:13px;
+      font-weight:500; font-family:inherit; cursor:pointer;
+      display:inline-flex; align-items:center; gap:5px;
+      white-space:nowrap; transition:background .12s;
     }
-    .submit:hover { background: hsl(202,96%,28%); }
+    .submit:hover { background:hsl(202,96%,28%); }
 
-    /* ── Facet bar (GitHub-style button group) ─────────────────── */
-    .facet-bar {
-      display: flex;
-      align-items: stretch;
-      margin-top: 8px;
-      border-radius: 7px;
-      /* Overflow visible so dropdowns escape; visual grouping via collapsed borders on .fw */
+    /* Barcode scanner button */
+    .scan-sep { width:1px; height:20px; background:hsl(0,0%,82%); flex-shrink:0; margin:0 2px; }
+    .scan-btn {
+      flex-shrink:0; padding:5px 7px; border:1px solid hsl(0,0%,84%); border-radius:6px;
+      background:white; cursor:pointer; display:inline-flex; align-items:center;
+      transition:background .1s, border-color .1s;
     }
+    .scan-btn:hover { background:hsl(0,0%,96%); border-color:hsl(0,0%,70%); }
+    .scan-btn img { display:block; width:18px; height:18px; }
 
-    /* Each facet wrapper: relative container + collapsed-border button-group technique */
-    .fw {
-      position: relative;
-      display: flex;
-    }
-    .fw + .fw { margin-left: -1px; } /* collapse adjacent borders */
-    .fw:first-child .fb { border-radius: 6px 0 0 6px; }
-    .fw:last-child  .fb { border-radius: 0 6px 6px 0; }
-
-    /* Facet button */
-    .fb {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 6px 11px; height: 100%;
-      border: 1px solid hsl(0,0%,80%);
-      background: white;
-      font-size: 12px; font-family: inherit; font-weight: 400;
-      color: hsl(0,0%,28%); cursor: pointer; white-space: nowrap;
-      transition: background 0.1s, border-color 0.1s, z-index 0s;
-      position: relative; z-index: 1;
-    }
-    .fb:hover { background: hsl(0,0%,97%); border-color: hsl(0,0%,68%); z-index: 2; }
-    .fb.open  { background: hsl(202,96%,97%); border-color: hsl(202,96%,55%); z-index: 3; color: hsl(202,96%,25%); }
-    .fb.set   { color: hsl(202,96%,25%); }
-
-    /* Label parts inside each button */
-    .bl  { color: hsl(0,0%,45%); font-weight: 400; }
-    .bsep { color: hsl(0,0%,70%); margin: 0 2px; }
-    .bv  { color: hsl(0,0%,18%); font-weight: 500; }
-    .chv { font-size: 9px; opacity: 0.55; margin-left: 1px; }
-
-    /* More / cog button */
-    .fb-more {
-      border-radius: 0 6px 6px 0 !important;
-      padding: 6px 10px;
-      font-size: 15px;
-      color: hsl(0,0%,50%);
-    }
-    .fb-more:hover { color: hsl(0,0%,20%); }
-
-    /* ── Dropdown ──────────────────────────────────────────────── */
-    .dd {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      background: white;
-      border: 1px solid hsl(0,0%,82%);
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.11);
-      z-index: 300;
-      min-width: 190px;
-      overflow: hidden;
-    }
-    .dd.wide { min-width: 240px; }
-
-    .dd-srch {
-      padding: 8px 10px;
-      border-bottom: 1px solid hsl(0,0%,93%);
-    }
-    .dd-srch input {
-      width: 100%; border: 1px solid hsl(0,0%,82%); border-radius: 5px;
-      padding: 5px 8px; font-size: 12px; font-family: inherit;
-      outline: none; box-sizing: border-box;
-    }
-    .dd-srch input:focus { border-color: hsl(202,96%,37%); }
-
-    .dd-list { max-height: 230px; overflow-y: auto; padding: 4px 0; }
-
-    .dd-item {
-      display: flex; align-items: center; gap: 8px;
-      width: 100%; padding: 7px 14px;
-      border: none; background: none; text-align: left;
-      font-size: 13px; font-family: inherit; color: hsl(0,0%,20%);
-      cursor: pointer; transition: background 0.1s;
-    }
-    .dd-item:hover { background: hsl(0,0%,96%); }
-    .dd-item.sel   { background: hsl(202,96%,96%); color: hsl(202,96%,25%); font-weight: 500; }
-    .dd-item input[type="checkbox"],
-    .dd-item input[type="radio"] {
-      accent-color: hsl(202,96%,37%); cursor: pointer; flex-shrink: 0;
-    }
-    .dd-item-main { flex: 1; }
-    .dd-count { font-size: 11px; color: hsl(0,0%,55%); white-space: nowrap; }
-    .dd-check { margin-left: auto; color: hsl(202,96%,37%); font-size: 12px; }
-    .dd-meta  { font-weight: 400; color: hsl(0,0%,50%); font-size: 11px; }
-
-    .dd-group-label {
-      padding: 6px 14px 3px; font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.06em; color: hsl(0,0%,50%);
-    }
-    .dd-hint {
-      padding: 10px 14px; font-size: 12px; color: hsl(0,0%,52%); font-style: italic;
+    /* Panel (attached below input-row when open) */
+    .panel {
+      position:absolute; top:100%; left:0; right:0;
+      background:white;
+      border:1.5px solid hsl(202,96%,37%); border-top:none;
+      border-radius:0 0 10px 10px;
+      box-shadow:0 8px 28px rgba(0,0,0,.14), 0 0 0 3px hsla(202,96%,37%,.12);
+      z-index:500; overflow:visible;
     }
 
-    .dd-foot {
-      padding: 6px 10px 8px;
-      border-top: 1px solid hsl(0,0%,93%);
+    /* Facet bar inside panel */
+    .pf-bar {
+      display:flex; border-bottom:1px solid hsl(0,0%,90%);
+      background:hsl(0,0%,98.5%);
     }
-    .dd-clear {
-      width: 100%; padding: 5px; border: 1px solid hsl(0,0%,80%);
-      border-radius: 5px; background: none; font-size: 12px;
-      cursor: pointer; color: hsl(0,0%,45%); font-family: inherit;
-      text-align: center; transition: all 0.12s;
+    .pf-wrap { flex:1; position:relative; display:flex; }
+    .pf-wrap + .pf-wrap { border-left:1px solid hsl(0,0%,90%); }
+    /* Cog column is narrower than facet columns */
+    .pf-wrap--cog { flex:0 0 38px; }
+    /* Corner facets must mirror the panel's border-radius */
+    .pf-wrap--first { border-bottom-left-radius:9px; }
+    .pf-wrap--first .pf-btn { border-bottom-left-radius:9px; }
+    .pf-wrap--last  { border-bottom-right-radius:9px; }
+    .pf-wrap--last  .pf-btn { border-bottom-right-radius:9px; }
+    .pf-btn {
+      flex:1; padding:7px 4px; border:none; background:transparent;
+      font-size:11px; font-family:inherit; color:hsl(0,0%,35%);
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      gap:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      transition:background .08s;
     }
-    .dd-clear:hover { background: hsl(0,0%,96%); border-color: hsl(0,0%,60%); }
+    .pf-btn:hover  { background:hsl(0,0%,95%); color:hsl(202,96%,28%); }
+    .pf-btn.active { color:hsl(202,96%,28%); font-weight:600; }
+    .pf-caret { font-size:8px; opacity:.5; flex-shrink:0; }
+
+    /* Dropdown from facet bar */
+    .pf-drop {
+      position:absolute; top:calc(100% + 2px); left:0;
+      min-width:200px; background:white;
+      border:1px solid hsl(0,0%,82%); border-radius:8px;
+      box-shadow:0 6px 20px rgba(0,0,0,.14);
+      z-index:700; overflow:hidden;
+    }
+    .pf-drop.right { left:auto; right:0; }
+    .pf-drop-scroll { max-height:240px; overflow-y:auto; }
+    .pf-search {
+      border:none; border-bottom:1px solid hsl(0,0%,90%);
+      padding:8px 12px; font-size:12px; font-family:inherit;
+      width:100%; box-sizing:border-box; outline:none; color:hsl(0,0%,15%);
+    }
+    .pf-search::placeholder { color:hsl(0,0%,58%); }
+
+    /* Search row with dice button (author/subject) */
+    .pf-search-row {
+      display:flex; align-items:stretch; border-bottom:1px solid hsl(0,0%,90%);
+    }
+    .pf-search-inline {
+      flex:1; border:none; padding:8px 12px; font-size:12px;
+      font-family:inherit; outline:none; color:hsl(0,0%,15%); background:transparent;
+    }
+    .pf-search-inline::placeholder { color:hsl(0,0%,58%); }
+    .pf-dice {
+      padding:4px 9px; border:none; border-left:1px solid hsl(0,0%,90%);
+      background:transparent; cursor:pointer; font-size:15px; flex-shrink:0;
+      transition:transform .2s; line-height:1;
+    }
+    .pf-dice:hover { transform:rotate(120deg); background:hsl(0,0%,96%); }
+
+    /* Fiction/Nonfiction pinned section in genre dropdown */
+    .pf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
+    .pf-fiction-sep { height:1px; background:hsl(0,0%,88%); }
+
+    /* Availability note link */
+    .pf-avail-note {
+      padding:6px 12px; font-size:11px; color:hsl(0,0%,52%);
+      border-top:1px solid hsl(0,0%,92%);
+    }
+    .pf-avail-note a { color:hsl(202,96%,37%); text-decoration:none; }
+    .pf-avail-note a:hover { text-decoration:underline; }
+
+    .pf-item {
+      display:flex; align-items:center; gap:8px;
+      padding:7px 12px; font-size:12px; font-family:inherit;
+      color:hsl(0,0%,20%); cursor:pointer; border:none;
+      background:transparent; width:100%; text-align:left;
+      transition:background .07s;
+    }
+    .pf-item:hover { background:hsl(202,96%,96%); color:hsl(202,96%,28%); }
+    .pf-item.selected { font-weight:600; color:hsl(202,96%,28%); }
+    .pf-item input[type="checkbox"], .pf-item input[type="radio"] {
+      accent-color:hsl(202,96%,37%); flex-shrink:0; cursor:pointer;
+    }
+    .pf-count { margin-left:auto; font-size:11px; color:hsl(0,0%,55%); }
+    .pf-empty { padding:10px 12px; font-size:12px; color:hsl(0,0%,55%); text-align:center; }
+    .pf-hint { padding:6px 12px; font-size:11px; color:hsl(0,0%,55%); font-style:italic; }
+
+    /* Autocomplete results */
+    .ac-scroll { max-height:280px; overflow-y:auto; }
+    .ac-spin, .ac-hint-msg, .ac-empty {
+      padding:16px; text-align:center; font-size:13px; color:hsl(0,0%,55%);
+    }
+    .ac-row {
+      display:flex; align-items:center; gap:12px; padding:10px 14px;
+      text-decoration:none; border-bottom:1px solid hsl(0,0%,94%);
+      transition:background .1s; cursor:pointer; color:inherit;
+    }
+    .ac-row:hover { background:hsl(0,0%,97%); }
+    .ac-row:last-of-type { border-bottom:none; }
+    .ac-cover {
+      width:36px; height:54px; object-fit:cover; border-radius:3px;
+      background:hsl(0,0%,90%); flex-shrink:0; display:block;
+      box-shadow:1px 1px 3px rgba(0,0,0,.15);
+    }
+    .ac-blank {
+      width:36px; height:54px; flex-shrink:0; border-radius:3px;
+      background:hsl(48,20%,88%); display:flex;
+      align-items:center; justify-content:center; font-size:18px;
+    }
+    .ac-body { flex:1; min-width:0; text-align:left; }
+    .ac-title {
+      font-family:Georgia,serif; font-size:14px; font-weight:600;
+      color:hsl(202,96%,22%); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .ac-author { font-size:12px; color:hsl(0,0%,45%); margin-top:2px; }
+    .ac-year   { font-size:11px; color:hsl(0,0%,58%); }
+    .ac-meta   { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+    .ac-badge  { font-size:10px; font-weight:600; padding:2px 6px; border-radius:3px; white-space:nowrap; }
+    .ac-badge--readable { background:hsl(142,50%,91%); color:hsl(142,50%,22%); }
+    .ac-badge--catalog  { background:hsl(0,0%,92%); color:hsl(0,0%,42%); }
+    .ac-star   { font-size:11px; color:hsl(40,80%,38%); white-space:nowrap; }
+    .ac-foot {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 14px; border-top:1px solid hsl(0,0%,92%);
+    }
+    .ac-add-book {
+      font-size:12px; color:hsl(202,96%,37%); text-decoration:none;
+      font-weight:500; padding:5px 10px; border-radius:5px;
+      border:1px solid hsl(202,96%,80%); transition:background .1s; white-space:nowrap;
+    }
+    .ac-add-book:hover { background:hsl(202,96%,96%); }
+    .ac-see-all {
+      background:hsl(202,96%,37%); color:white; border:none;
+      border-radius:6px; padding:7px 18px; font-size:13px;
+      font-weight:500; font-family:inherit; cursor:pointer;
+      white-space:nowrap; transition:background .12s;
+    }
+    .ac-see-all:hover { background:hsl(202,96%,28%); }
   `;
 
-  // ── Render ──────────────────────────────────────────────────────
+  // ── Facet panel helpers ───────────────────────────────────────
+  _facetLabel(name) {
+    const f = this.filters;
+    switch (name) {
+      case 'sort':   return f.sort ? getSortLabel(f.sort) : 'Sort by';
+      case 'avail':  return f.availability ? getAvailabilityLabel(f.availability) : 'Availability';
+      case 'lang':   return f.languages?.length ? `Language (${f.languages.length})` : 'Language';
+      case 'genre': {
+        const total = (f.genres?.length ?? 0) + (f.fictionFilter ? 1 : 0);
+        return total ? `Genre (${total})` : 'Genre';
+      }
+      case 'author': return f.authors?.length   ? `Author (${f.authors.length})`   : 'Author';
+      case 'subject':return f.subjects?.length  ? `Subject (${f.subjects.length})` : 'Subject';
+    }
+  }
+
+  _isFacetActive(name) {
+    const f = this.filters;
+    switch (name) {
+      case 'sort':   return !!f.sort;
+      case 'avail':  return !!f.availability;
+      case 'lang':   return f.languages?.length > 0;
+      case 'genre':  return (f.genres?.length > 0) || !!f.fictionFilter;
+      case 'author': return f.authors?.length > 0;
+      case 'subject':return f.subjects?.length > 0;
+    }
+  }
+
+  _renderFacetBtn(name, right = false, extraClass = '') {
+    return html`
+      <div class="pf-wrap ${extraClass}">
+        <button class="pf-btn ${this._isFacetActive(name) ? 'active' : ''}"
+                @click=${e => this._toggleFacet(name, e)}>
+          ${this._facetLabel(name)}<span class="pf-caret">▾</span>
+        </button>
+        ${this._openFacet === name ? this._renderDrop(name, right) : ''}
+      </div>`;
+  }
+
+  _renderDrop(name, right = false) {
+    const f = this.filters;
+    const cls = `pf-drop${right ? ' right' : ''}`;
+
+    if (name === 'sort') {
+      return html`<div class="${cls}"><div class="pf-drop-scroll">
+        ${SORT_OPTIONS.map(o => html`
+          <button class="pf-item ${f.sort === o.value ? 'selected' : ''}"
+                  @click=${() => this._emitFilter('sort', o.value)}>
+            <input type="radio" .checked=${f.sort === o.value} readonly> ${o.label}
+          </button>`)}
+      </div></div>`;
+    }
+
+    if (name === 'avail') {
+      return html`<div class="${cls}">
+        <div class="pf-drop-scroll">
+          ${AVAILABILITY_OPTIONS.map(o => html`
+            <button class="pf-item ${f.availability === o.value ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('availability', o.value)}>
+              <input type="radio" .checked=${f.availability === o.value} readonly>
+              ${o.label}
+              <span class="pf-count">${o.staticCount}</span>
+            </button>`)}
+        </div>
+        <div class="pf-avail-note">
+          Includes
+          <a href="https://openlibrary.org/help/faq/borrow#how" target="_blank" rel="noopener"
+             @click=${e => e.stopPropagation()}>
+            digitized preserved physical books
+          </a>
+        </div>
+      </div>`;
+    }
+
+    if (name === 'lang') {
+      const visible = LANGUAGE_OPTIONS.filter(o =>
+        !this._langSearch || o.label.toLowerCase().includes(this._langSearch.toLowerCase()));
+      return html`<div class="${cls}">
+        <input class="pf-search" placeholder="Search languages…" .value=${this._langSearch}
+               @input=${e => { this._langSearch = e.target.value; }}
+               @click=${e => e.stopPropagation()}>
+        <div class="pf-drop-scroll">
+          ${visible.length === 0 ? html`<div class="pf-empty">No languages found</div>` : ''}
+          ${visible.map(o => {
+            const checked = (f.languages ?? []).includes(o.value);
+            return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                @click=${() => this._emitFilter('languages', toggleArrayValue(f.languages ?? [], o.value))}>
+              <input type="checkbox" .checked=${checked} readonly> ${o.label}
+            </button>`;
+          })}
+        </div>
+      </div>`;
+    }
+
+    if (name === 'genre') {
+      const visible = GENRE_OPTIONS.filter(o =>
+        !this._genreSearch || o.label.toLowerCase().includes(this._genreSearch.toLowerCase()));
+      return html`<div class="${cls}">
+        <!-- Pinned Fiction / Nonfiction section -->
+        <div class="pf-fiction-section">
+          ${FICTION_OPTIONS.map(o => html`
+            <button class="pf-item ${f.fictionFilter === o.value ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('fictionFilter', f.fictionFilter === o.value ? '' : o.value)}>
+              <input type="checkbox" .checked=${f.fictionFilter === o.value} readonly> ${o.label}
+            </button>`)}
+        </div>
+        <div class="pf-fiction-sep"></div>
+        <!-- Genre search + scrollable list -->
+        <input class="pf-search" placeholder="Search genres…" .value=${this._genreSearch}
+               @input=${e => { this._genreSearch = e.target.value; }}
+               @click=${e => e.stopPropagation()}>
+        <div class="pf-drop-scroll">
+          ${visible.length === 0 ? html`<div class="pf-empty">No genres found</div>` : ''}
+          ${visible.map(o => {
+            const checked = (f.genres ?? []).includes(o.value);
+            return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                @click=${() => this._emitFilter('genres', toggleArrayValue(f.genres ?? [], o.value))}>
+              <input type="checkbox" .checked=${checked} readonly> ${o.label}
+            </button>`;
+          })}
+        </div>
+      </div>`;
+    }
+
+    if (name === 'author') {
+      const searching = this._authorSearch.trim().length >= 2;
+      const showDefaults = !searching && this._authorResults.length === 0;
+      return html`<div class="${cls}">
+        <div class="pf-search-row">
+          <input class="pf-search-inline" placeholder="Search authors…" .value=${this._authorSearch}
+                 @input=${this._onAuthorSearch} @click=${e => e.stopPropagation()}>
+          <button class="pf-dice" title="Shuffle suggestions"
+                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}>🎲</button>
+        </div>
+        <div class="pf-drop-scroll">
+          ${showDefaults ? html`<div class="pf-hint">Popular authors</div>` : ''}
+          ${showDefaults
+            ? this._defaultAuthors.map(name => {
+                const checked = (f.authors ?? []).includes(name);
+                return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('authors', toggleArrayValue(f.authors ?? [], name))}>
+                  <input type="checkbox" .checked=${checked} readonly> ${name}
+                </button>`;
+              })
+            : ''}
+          ${searching && this._authorResults.length === 0
+            ? html`<div class="pf-empty">No authors found</div>` : ''}
+          ${searching
+            ? this._authorResults.map(a => {
+                const checked = (f.authors ?? []).includes(a.name);
+                return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('authors', toggleArrayValue(f.authors ?? [], a.name))}>
+                  <input type="checkbox" .checked=${checked} readonly>
+                  ${a.name}
+                  ${a.work_count ? html`<span class="pf-count">${a.work_count.toLocaleString()}</span>` : ''}
+                </button>`;
+              })
+            : ''}
+        </div>
+      </div>`;
+    }
+
+    if (name === 'subject') {
+      const searching = this._subjectSearch.trim().length >= 2;
+      const showDefaults = !searching && this._subjectResults.length === 0;
+      return html`<div class="${cls}">
+        <div class="pf-search-row">
+          <input class="pf-search-inline" placeholder="Search subjects…" .value=${this._subjectSearch}
+                 @input=${this._onSubjectSearch} @click=${e => e.stopPropagation()}>
+          <button class="pf-dice" title="Shuffle suggestions"
+                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}>🎲</button>
+        </div>
+        <div class="pf-drop-scroll">
+          ${showDefaults ? html`<div class="pf-hint">Popular subjects</div>` : ''}
+          ${showDefaults
+            ? this._defaultSubjects.map(name => {
+                const checked = (f.subjects ?? []).includes(name);
+                return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('subjects', toggleArrayValue(f.subjects ?? [], name))}>
+                  <input type="checkbox" .checked=${checked} readonly> ${name}
+                </button>`;
+              })
+            : ''}
+          ${searching && this._subjectResults.length === 0
+            ? html`<div class="pf-empty">No subjects found</div>` : ''}
+          ${searching
+            ? this._subjectResults.map(s => {
+                const checked = (f.subjects ?? []).includes(s.name);
+                return html`<button class="pf-item ${checked ? 'selected' : ''}"
+                    @click=${() => this._emitFilter('subjects', toggleArrayValue(f.subjects ?? [], s.name))}>
+                  <input type="checkbox" .checked=${checked} readonly>
+                  ${s.name}
+                  ${s.work_count ? html`<span class="pf-count">${s.work_count.toLocaleString()}</span>` : ''}
+                </button>`;
+              })
+            : ''}
+        </div>
+      </div>`;
+    }
+  }
+
+  _renderFacetBar() {
+    return html`
+      <div class="pf-bar">
+        ${this._renderFacetBtn('avail',  false, 'pf-wrap--first')}
+        ${this._renderFacetBtn('lang')}
+        ${this._renderFacetBtn('genre')}
+        ${this._renderFacetBtn('author')}
+        ${this._renderFacetBtn('subject')}
+        <div class="pf-wrap pf-wrap--cog">
+          <button class="pf-btn" title="Search help"
+                  @click=${e => { e.stopPropagation(); this._howtoOpen = true; }}>⚙️</button>
+        </div>
+        ${this._renderFacetBtn('sort', true, 'pf-wrap--last')}
+      </div>
+      <ol-howto-modal .open=${this._howtoOpen} @close=${() => this._howtoOpen = false}></ol-howto-modal>`;
+  }
+
+  // ── Render ────────────────────────────────────────────────────
   render() {
-    const { _sort, _access, _language, _genres, _author, _subjects, _openFacet } = this;
-    const sortLabel = SORT_OPTIONS.find(o => o.value === _sort)?.label ?? 'Relevance';
-    const accessLabel = ACCESS_OPTIONS.find(a => a.value === _access)?.label;
-    const genreCount = _genres.length;
-    const subjectCount = _subjects.length;
+    const q = this._q.trim();
+    const showResults = q.length >= 2;
 
     return html`
-      <!-- Search input with chips -->
-      <div class="input-row">
-        ${this._chips()}
+      <div class="input-row ${this._open ? 'panel-open' : ''}">
+        ${(this.chips ?? []).map(c => html`
+          <span class="chip chip-${c.type}">
+            ${c.label}
+            <button class="chip-x" @click=${() => this._removeChip(c.type, c.value)}>×</button>
+          </span>`)}
+
         <input class="text-input" type="search" autocomplete="off"
-               placeholder="Search books, authors…"
-               .value=${this._q}
-               @input=${e => this._q = e.target.value}
-               @keydown=${e => { if (e.key === 'Enter') { this._openFacet = null; this._emit(); } }}>
-        <button class="submit" @click=${() => { this._openFacet = null; this._emit(); }}>
+               placeholder="Search books, authors…" .value=${this._q}
+               @focus=${this._onFocus}
+               @input=${this._onInput}
+               @keydown=${this._onKeyDown}>
+
+        <button class="submit" @click=${this._submit}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
             <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
           </svg>
           Search
         </button>
+        <span class="scan-sep"></span>
+        <button class="scan-btn" title="Scan ISBN barcode" @click=${e => e.stopPropagation()}>
+          <img src="https://openlibrary.org/static/images/icons/barcode_scanner.svg"
+               alt="Scan barcode" width="18" height="18">
+        </button>
       </div>
 
-      <!-- Facet bar -->
-      <div class="facet-bar">
+      ${this._open ? html`
+        <div class="panel">
+          ${this.showFacets ? this._renderFacetBar() : ''}
 
-        <!-- Sort by -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'sort' ? 'open' : ''} ${_sort ? 'set' : ''}"
-                  @click=${() => this._toggle('sort')}>
-            ${this._btnLabel('Sort by', _sort ? sortLabel : null)}
-          </button>
-          ${_openFacet === 'sort' ? this._sortPanel() : ''}
-        </div>
-
-        <!-- Access -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'access' ? 'open' : ''} ${_access ? 'set' : ''}"
-                  @click=${() => this._toggle('access')}>
-            ${this._btnLabel('Access', accessLabel ?? null)}
-          </button>
-          ${_openFacet === 'access' ? this._accessPanel() : ''}
-        </div>
-
-        <!-- Language -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'language' ? 'open' : ''} ${_language ? 'set' : ''}"
-                  @click=${() => this._toggle('language')}>
-            ${this._btnLabel('Language', _language?.label ?? null)}
-          </button>
-          ${_openFacet === 'language' ? this._languagePanel() : ''}
-        </div>
-
-        <!-- Genre -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'genre' ? 'open' : ''} ${genreCount ? 'set' : ''}"
-                  @click=${() => this._toggle('genre')}>
-            ${this._btnLabel('Genre', genreCount ? `${genreCount} selected` : null)}
-          </button>
-          ${_openFacet === 'genre' ? this._genrePanel() : ''}
-        </div>
-
-        <!-- Author (lazy) -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'author' ? 'open' : ''} ${_author ? 'set' : ''}"
-                  @click=${() => this._toggle('author')}>
-            ${this._btnLabel('Author', _author ?? null)}
-          </button>
-          ${_openFacet === 'author' ? this._authorPanel() : ''}
-        </div>
-
-        <!-- Subject (lazy) -->
-        <div class="fw">
-          <button class="fb ${_openFacet === 'subject' ? 'open' : ''} ${subjectCount ? 'set' : ''}"
-                  @click=${() => this._toggle('subject')}>
-            ${this._btnLabel('Subject', subjectCount ? `${subjectCount} selected` : null)}
-          </button>
-          ${_openFacet === 'subject' ? this._subjectPanel() : ''}
-        </div>
-
-        <!-- More (stub) -->
-        <div class="fw">
-          <button class="fb fb-more ${_openFacet === 'more' ? 'open' : ''}"
-                  title="More filters (coming soon)" aria-label="More filters"
-                  @click=${() => this._toggle('more')}>⚙️</button>
-        </div>
-
-      </div>
+          ${this._loading ? html`<div class="ac-spin">Searching…</div>` : showResults ? html`
+            <div class="ac-scroll">
+              ${this._suggestions.length === 0
+                ? html`<div class="ac-empty">No results</div>`
+                : this._suggestions.map(w => {
+                    const cover = w.cover_i
+                      ? `https://covers.openlibrary.org/b/id/${w.cover_i}-S.jpg` : null;
+                    const isReadable = w.ebook_access === 'public' || w.ebook_access === 'borrowable';
+                    return html`
+                      <a class="ac-row" href="https://openlibrary.org${w.key}"
+                         target="_blank" rel="noopener"
+                         @click=${() => this._open = false}>
+                        ${cover
+                          ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
+                          : html`<div class="ac-blank">📖</div>`}
+                        <div class="ac-body">
+                          <div class="ac-title">${w.title}</div>
+                          <div class="ac-author">${(w.author_name ?? []).slice(0,2).join(', ')}</div>
+                          ${w.first_publish_year ? html`<div class="ac-year">${w.first_publish_year}</div>` : ''}
+                        </div>
+                        <div class="ac-meta">
+                          <span class="ac-badge ${isReadable ? 'ac-badge--readable' : 'ac-badge--catalog'}">
+                            ${isReadable ? 'Readable' : 'Catalog'}
+                          </span>
+                          ${w.ratings_average
+                            ? html`<span class="ac-star">★ ${w.ratings_average.toFixed(1)}</span>`
+                            : ''}
+                        </div>
+                      </a>`;})}
+            </div>
+            <div class="ac-foot">
+              <a class="ac-add-book" href="https://openlibrary.org/books/add"
+                 target="_blank" rel="noopener"
+                 @click=${e => e.stopPropagation()}>+ Add Book</a>
+              <button class="ac-see-all" @click=${() => {
+                this._open = false;
+                if (!q) return;
+                this.dispatchEvent(new CustomEvent('ol-search', {
+                  detail: { q }, bubbles: true, composed: true,
+                }));
+              }}>See all ${this._total.toLocaleString()} results →</button>
+            </div>
+          ` : this.showFacets ? '' : html`<div class="ac-hint-msg">Start typing to search books…</div>`}
+        </div>` : ''}
     `;
   }
 }

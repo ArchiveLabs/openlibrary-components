@@ -19,18 +19,42 @@ async def search(
     page: int = 1,
     limit: int = 20,
     sort: Optional[str] = None,
-    language: Optional[str] = None,
+    # multi-value params — each repeated key is OR'd on the backend
+    language: Optional[list[str]] = Query(default=None),
+    genres:   Optional[list[str]] = Query(default=None),
+    author:   Optional[list[str]] = Query(default=None),
     subjects: Optional[list[str]] = Query(default=None),
-    author: Optional[str] = None,
-    ebook_access: Optional[str] = None,
+    availability: Optional[str] = None,
+    fiction_filter: Optional[str] = Query(default=None, alias="fictionFilter"),
 ):
     q_parts: list[str] = []
     if q:
         q_parts.append(q)
+
+    # OR multiple authors inside a group
     if author:
-        q_parts.append(f'author:"{author}"')
-    for subject in subjects or []:
-        q_parts.append(f'subject:"{subject}"')
+        if len(author) == 1:
+            q_parts.append(f'author:"{author[0]}"')
+        else:
+            q_parts.append("(" + " OR ".join(f'author:"{a}"' for a in author) + ")")
+
+    # OR multiple genres (mapped to OL subject field)
+    if genres:
+        if len(genres) == 1:
+            q_parts.append(f'subject:"{genres[0]}"')
+        else:
+            q_parts.append("(" + " OR ".join(f'subject:"{g}"' for g in genres) + ")")
+
+    # Subjects are OR'd
+    if subjects:
+        if len(subjects) == 1:
+            q_parts.append(f'subject:"{subjects[0]}"')
+        else:
+            q_parts.append("(" + " OR ".join(f'subject:"{s}"' for s in subjects) + ")")
+
+    # Fiction/Nonfiction pinned filter
+    if fiction_filter in ("fiction", "nonfiction"):
+        q_parts.append(f'subject:"{fiction_filter}"')
 
     params: dict = {
         "q": " ".join(q_parts) or "*",
@@ -38,15 +62,28 @@ async def search(
         "limit": limit,
         "fields": "key,title,author_name,cover_i,first_publish_year,ratings_average,ratings_count,ebook_access,subject",
     }
+
     if sort:
         params["sort"] = sort
-    if language:
-        params["language"] = language
-    if ebook_access:
-        params["ebook_access"] = ebook_access
+
+    # Languages: pass multiple language params to OL (they are OR'd there)
+    # httpx handles list values as repeated params automatically
+    lang_list = language or []
+
+    # Availability maps to OL ebook_access / has_fulltext
+    if availability == "readable":
+        # borrowable OR public (open access) — books you can actually read online
+        q_parts.append("(ebook_access:borrowable OR ebook_access:public)")
+        params["q"] = " ".join(q_parts) or "*"
+    elif availability in ("open", "borrowable", "printdisabled"):
+        params["ebook_access"] = availability
 
     async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{OL_BASE}/search.json", params=params, timeout=15.0)
+        resp = await client.get(
+            f"{OL_BASE}/search.json",
+            params={**params, **{f"language": lang_list}} if lang_list else params,
+            timeout=15.0,
+        )
         resp.raise_for_status()
     return resp.json()
 
