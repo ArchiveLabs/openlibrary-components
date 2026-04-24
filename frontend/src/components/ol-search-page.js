@@ -276,7 +276,7 @@ export class OlSearchPage extends LitElement {
     switch (type) {
       case 'access':  this._availability  = ''; break;
       case 'fiction': this._fictionFilter = ''; break;
-      case 'lang':    this._languages     = this._languages.filter(v => v !== value); break;
+      case 'lang':    this._languages     = []; break;
       case 'genre':   this._genres        = this._genres.filter(v => v !== value); break;
       case 'author':  this._authors       = this._authors.filter(v => v !== value); break;
       case 'subject': this._subjects      = this._subjects.filter(v => v !== value); break;

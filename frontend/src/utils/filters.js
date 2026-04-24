@@ -190,8 +190,13 @@ export function buildChips(filters) {
     });
   }
 
-  for (const lang of filters.languages ?? []) {
-    chips.push({ type: 'lang', label: `language: ${getLangLabel(lang)}`, value: lang });
+  if ((filters.languages ?? []).length > 0) {
+    const labels = filters.languages.map(getLangLabel);
+    chips.push({
+      type:  'lang',
+      label: `language: ${labels.join(' OR ')}`,
+      value: '__all__',
+    });
   }
 
   for (const genre of filters.genres ?? []) {
