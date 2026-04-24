@@ -213,17 +213,33 @@ describe('buildChips', () => {
     expect(chip).toEqual({ type: 'fiction', label: 'nonfiction only', value: 'nonfiction' });
   });
 
-  it('builds one chip per selected language', () => {
-    const chips = buildChips({ ...EMPTY_FILTERS, languages: ['eng', 'fre'] });
+  it('builds one combined chip for multiple selected languages (OR display)', () => {
+    const chips = buildChips({ ...EMPTY_FILTERS, languages: ['eng', 'spa'] });
     const langChips = chips.filter(c => c.type === 'lang');
-    expect(langChips).toHaveLength(2);
-    expect(langChips[0]).toEqual({ type: 'lang', label: 'language: English', value: 'eng' });
-    expect(langChips[1]).toEqual({ type: 'lang', label: 'language: French',  value: 'fre' });
+    expect(langChips).toHaveLength(1);
+    expect(langChips[0]).toEqual({
+      type:  'lang',
+      label: 'language: English OR Spanish',
+      value: null,
+    });
+  });
+
+  it('builds a single language chip with no OR when only one language is selected', () => {
+    const chips = buildChips({ ...EMPTY_FILTERS, languages: ['eng'] });
+    const langChips = chips.filter(c => c.type === 'lang');
+    expect(langChips).toHaveLength(1);
+    expect(langChips[0]).toEqual({
+      type:  'lang',
+      label: 'language: English',
+      value: null,
+    });
   });
 
   it('uses raw language code for unknown language', () => {
     const chips = buildChips({ ...EMPTY_FILTERS, languages: ['xyz'] });
-    expect(chips.find(c => c.type === 'lang').label).toBe('language: xyz');
+    const chip = chips.find(c => c.type === 'lang');
+    expect(chip.label).toBe('language: xyz');
+    expect(chip.value).toBeNull();
   });
 
   it('builds one chip per selected genre', () => {

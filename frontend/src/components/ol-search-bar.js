@@ -231,7 +231,7 @@ export class OlSearchBar extends LitElement {
       const f = this._localFilters;
       if (c.type === 'access')  this._emitFilter('availability',  '');
       else if (c.type === 'fiction') this._emitFilter('fictionFilter', '');
-      else if (c.type === 'lang')    this._emitFilter('languages', (f.languages ?? []).filter(v => v !== c.value));
+      else if (c.type === 'lang')    this._emitFilter('languages', []);
       else if (c.type === 'genre')   this._emitFilter('genres',    (f.genres    ?? []).filter(v => v !== c.value));
       else if (c.type === 'author')  this._emitFilter('authors',   (f.authors   ?? []).filter(v => v !== c.value));
       else if (c.type === 'subject') this._emitFilter('subjects',  (f.subjects  ?? []).filter(v => v !== c.value));
