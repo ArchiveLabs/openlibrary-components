@@ -195,7 +195,7 @@ export function buildChips(filters) {
     chips.push({
       type:  'lang',
       label: `language: ${labels.join(' OR ')}`,
-      value: '__all__',
+      value: null,
     });
   }
 

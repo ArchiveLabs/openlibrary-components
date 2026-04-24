@@ -220,7 +220,7 @@ describe('buildChips', () => {
     expect(langChips[0]).toEqual({
       type:  'lang',
       label: 'language: English OR Spanish',
-      value: '__all__',
+      value: null,
     });
   });
 
@@ -231,7 +231,7 @@ describe('buildChips', () => {
     expect(langChips[0]).toEqual({
       type:  'lang',
       label: 'language: English',
-      value: '__all__',
+      value: null,
     });
   });
 
@@ -239,7 +239,7 @@ describe('buildChips', () => {
     const chips = buildChips({ ...EMPTY_FILTERS, languages: ['xyz'] });
     const chip = chips.find(c => c.type === 'lang');
     expect(chip.label).toBe('language: xyz');
-    expect(chip.value).toBe('__all__');
+    expect(chip.value).toBeNull();
   });
 
   it('builds one chip per selected genre', () => {
