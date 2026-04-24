@@ -239,6 +239,7 @@ export class OlSearchBar extends LitElement {
         ['genres',        EMPTY_FILTERS.genres],
         ['authors',       EMPTY_FILTERS.authors],
         ['subjects',      EMPTY_FILTERS.subjects],
+        ['sort',          EMPTY_FILTERS.sort],
       ];
       for (const [field, empty] of fields) {
         const cur = f[field];
@@ -679,9 +680,9 @@ export class OlSearchBar extends LitElement {
         ${!this.showFacets && chips.length ? html`
           <div class="chip-bar">
             ${chipItems}
-            <button class="clear-all-btn"
+            ${this._hasActiveFilters() ? html`<button class="clear-all-btn"
                     aria-label="Clear all filters"
-                    @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>
+                    @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
           </div>` : ''}
 
         ${this.showFacets && this._open ? html`
@@ -689,9 +690,9 @@ export class OlSearchBar extends LitElement {
             ${chips.length ? html`
               <div class="panel-chips">
                 ${chipItems}
-                <button class="clear-all-btn"
+                ${this._hasActiveFilters() ? html`<button class="clear-all-btn"
                         aria-label="Clear all filters"
-                        @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>
+                        @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
               </div>` : ''}
             ${this._renderFacetBar(!this._loading && !showResults)}
 
