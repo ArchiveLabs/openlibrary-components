@@ -42,6 +42,7 @@ export class OlSearchBar extends LitElement {
     _subjectResults:  { state: true },
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
+    _facetsLoading:   { state: true },
   };
 
   constructor() {
@@ -67,8 +68,10 @@ export class OlSearchBar extends LitElement {
     this._subjectResults  = [];
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
+    this._facetsLoading   = false;
     this._authorTimer     = null;
     this._subjectTimer    = null;
+    this._acAbort         = null;   // AbortController for in-flight autocomplete fetch
 
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) {
@@ -89,6 +92,10 @@ export class OlSearchBar extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
+    this._acAbort?.abort();
+    clearTimeout(this._timer);
+    clearTimeout(this._authorTimer);
+    clearTimeout(this._subjectTimer);
   }
 
   updated(changed) {
@@ -133,6 +140,11 @@ export class OlSearchBar extends LitElement {
   }
 
   async _fetchAutocomplete() {
+    // Cancel any in-flight request before starting a new one.
+    this._acAbort?.abort();
+    this._acAbort = new AbortController();
+    const { signal } = this._acAbort;
+
     const q = this._q.trim();
     const f = this._localFilters;
     try {
@@ -144,13 +156,15 @@ export class OlSearchBar extends LitElement {
       for (const v of f.genres    ?? []) p.append('genres',   v);
       for (const v of f.authors   ?? []) p.append('author',   v);
       for (const v of f.subjects  ?? []) p.append('subjects', v);
-      const d = await (await fetch(`${this.apiBase}/api/search?${p}`)).json();
+      const d = await (await fetch(`${this.apiBase}/api/search?${p}`, { signal })).json();
       this._suggestions = d.docs ?? [];
       this._total       = d.num_found ?? 0;
-    } catch {
-      this._suggestions = []; this._total = 0;
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        this._suggestions = []; this._total = 0;
+      }
     } finally {
-      this._loading = false;
+      if (!signal.aborted) this._loading = false;
     }
   }
 
@@ -212,9 +226,14 @@ export class OlSearchBar extends LitElement {
     clearTimeout(this._authorTimer);
     const q = e.detail.q;
     if (q.trim().length < 2) { this._authorResults = []; return; }
+    this._facetsLoading = true;
     this._authorTimer = setTimeout(async () => {
-      const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
-      this._authorResults = d.docs ?? [];
+      try {
+        const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
+        this._authorResults = d.docs ?? [];
+      } finally {
+        this._facetsLoading = false;
+      }
     }, 250);
   }
 
@@ -222,9 +241,14 @@ export class OlSearchBar extends LitElement {
     clearTimeout(this._subjectTimer);
     const q = e.detail.q;
     if (q.trim().length < 2) { this._subjectResults = []; return; }
+    this._facetsLoading = true;
     this._subjectTimer = setTimeout(async () => {
-      const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
-      this._subjectResults = d.docs ?? [];
+      try {
+        const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
+        this._subjectResults = d.docs ?? [];
+      } finally {
+        this._facetsLoading = false;
+      }
     }, 250);
   }
 
@@ -457,6 +481,7 @@ export class OlSearchBar extends LitElement {
             .subjectResults=${this._subjectResults}
             .defaultAuthors=${this._defaultAuthors}
             .defaultSubjects=${this._defaultSubjects}
+            .facetsLoading=${this._facetsLoading}
             @ol-facet-change=${this._onDropFacetChange}
             @ol-facet-search-authors=${this._onDropAuthorSearch}
             @ol-facet-search-subjects=${this._onDropSubjectSearch}
@@ -505,11 +530,17 @@ export class OlSearchBar extends LitElement {
       </span>`);
 
     return html`
-      <div class="search-outer ${this._open ? 'open' : ''}">
+      <div class="search-outer ${this._open ? 'open' : ''}"
+           role="search">
         <div class="input-row">
           <div class="input-controls">
             <input class="text-input" type="text" autocomplete="off"
                    placeholder="Search books, authors…" .value=${this._q}
+                   role="combobox"
+                   aria-label="Search books and authors"
+                   aria-expanded=${this._open && this.showFacets ? 'true' : 'false'}
+                   aria-autocomplete="list"
+                   aria-haspopup="listbox"
                    @focus=${this._onFocus}
                    @input=${this._onInput}
                    @keydown=${this._onKeyDown}>
@@ -537,8 +568,8 @@ export class OlSearchBar extends LitElement {
             ${chips.length ? html`<div class="panel-chips">${chipItems}</div>` : ''}
             ${this._renderFacetBar(!this._loading && !showResults)}
 
-            ${this._loading ? html`<div class="ac-spin">Searching…</div>` : showResults ? html`
-              <div class="ac-scroll">
+            ${this._loading ? html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>` : showResults ? html`
+              <div class="ac-scroll" role="listbox" aria-label="Search suggestions">
                 ${this._suggestions.length === 0
                   ? html`<div class="ac-empty">No results</div>`
                   : this._suggestions.map(w => {
@@ -556,6 +587,7 @@ export class OlSearchBar extends LitElement {
                       return html`
                         <a class="ac-row" href="${this.siteBase}${linkKey}"
                            target="_blank" rel="noopener"
+                           role="option"
                            @click=${() => this._open = false}>
                           ${cover
                             ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
