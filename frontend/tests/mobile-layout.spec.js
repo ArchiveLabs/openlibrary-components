@@ -11,6 +11,7 @@ test.describe('Mobile layout (375px)', () => {
   test('topbar is hidden on mobile', async ({ page }) => {
     await page.goto('/');
     const topbar = page.locator('ol-topbar');
+    await expect(topbar).toHaveCount(1);
     await expect(topbar).toBeHidden();
     await page.screenshot({ path: 'tests/screenshots/mobile-homepage.png', fullPage: false });
   });
@@ -18,15 +19,19 @@ test.describe('Mobile layout (375px)', () => {
   test('header fits within 375px viewport', async ({ page }) => {
     await page.goto('/');
     const header = page.locator('ol-header');
+    await expect(header).toBeVisible();
     const box = await header.boundingBox();
-    expect(box.width).toBeLessThanOrEqual(375);
+    expect(box).not.toBeNull();
+    expect(box?.width).toBeLessThanOrEqual(375);
     await page.screenshot({ path: 'tests/screenshots/mobile-header.png', clip: { x: 0, y: 0, width: 375, height: 80 } });
   });
 
   test('cover grid does not overflow horizontally', async ({ page }) => {
     await page.goto('/');
-    // Wait for page to settle
-    await page.waitForTimeout(500);
+    // Wait for page to settle deterministically
+    await page.waitForLoadState('networkidle');
+    // Also wait for the cover grid to be in the DOM
+    await page.locator('ol-search-page').waitFor({ state: 'attached' });
     // Check no horizontal scroll
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(scrollWidth).toBeLessThanOrEqual(375);
@@ -48,6 +53,9 @@ test.describe('Desktop layout (1440px) — regression', () => {
 
   test('header shows nav on desktop', async ({ page }) => {
     await page.goto('/');
+    // Wait for ol-header to be defined and upgraded
+    await page.waitForFunction(() => customElements.get('ol-header') !== undefined);
+    await page.locator('ol-header').waitFor({ state: 'attached' });
     // Nav links should be visible on desktop — check via evaluating computed style
     // ol-header uses shadow DOM, so we evaluate inside it
     const navVisible = await page.evaluate(() => {
