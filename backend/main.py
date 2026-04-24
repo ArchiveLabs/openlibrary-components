@@ -76,9 +76,13 @@ async def search(
 
     # Availability: the 'ebook_access' URL param (not embedded in q) is what triggers
     # OL's Solr block-join inner-hits so editions.docs gets populated in the response.
-    # 'readable' maps to borrowable (covers IA lending library, the vast majority of cases).
+    # 'readable' includes both IA lending (borrowable) and openly readable (public) books.
+    # We add an explicit OR to q_parts so both tiers appear in results, and keep the
+    # ebook_access param (set to borrowable) to trigger block-join inner-hits.
     if availability == "readable":
-        params["ebook_access"] = "borrowable"
+        q_parts.append('(ebook_access:[borrowable TO public])')
+        params["q"] = " ".join(q_parts)  # refresh after appending ebook_access filter
+        params["ebook_access"] = "borrowable"  # trigger block-join inner-hits
     elif availability == "open":
         params["ebook_access"] = "public"  # OL enum: 'public', not 'open'
     elif availability in ("borrowable", "printdisabled"):
