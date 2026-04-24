@@ -84,11 +84,15 @@ Always start `make dev` before testing UI changes manually. Vite serves on **por
 
 ## Adding a New Lit Component
 
+Every component must satisfy this checklist before merging:
+
 1. Create `frontend/src/components/ol-<name>.js`.
-2. Add JSDoc at the top describing props and events.
-3. Add `customElements.define('ol-<name>', ...)` at the bottom.
-4. Add a section to `frontend/src/components/README.md`.
-5. Write at least a smoke test (or pure-logic tests if applicable).
+2. Add JSDoc block at the top: props, events, any usage modes.
+3. Use CSS custom properties from `styles/tokens.css` (not raw HSL values).
+4. Add `customElements.define('ol-<name>', ...)` at the bottom.
+5. Add a section to `frontend/src/components/README.md`.
+6. Add a `_render<Name>()` section to `frontend/src/components/ol-catalog.js` so the component appears at `/catalog.html`.
+7. Write pure-logic tests in `utils/` + Vitest for any extractable logic.
 
 ## Commit Format
 

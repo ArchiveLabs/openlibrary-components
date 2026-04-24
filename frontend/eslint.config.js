@@ -22,6 +22,8 @@ export default [
         customElements: 'readonly',
         CustomEvent: 'readonly',
         localStorage: 'readonly',
+        AbortController: 'readonly',
+        Promise: 'readonly',
       },
     },
     rules: {

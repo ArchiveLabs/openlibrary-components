@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import {
   POPULAR_AUTHORS, POPULAR_SUBJECTS,
   EMPTY_FILTERS, shufflePick, bestEdition,
@@ -23,12 +23,13 @@ import './ol-facet-drop.js';
  */
 export class OlSearchBar extends LitElement {
   static properties = {
-    q:          { type: String },
-    chips:      { type: Array },
-    showFacets: { type: Boolean },
-    filters:    { type: Object },   // initial/external filter state
-    apiBase:    { type: String },   // prefix for /api/* calls, default ''
-    siteBase:   { type: String },   // prefix for item links, default 'https://openlibrary.org'
+    q:           { type: String },
+    chips:       { type: Array },
+    showFacets:  { type: Boolean },
+    filters:     { type: Object },   // initial/external filter state
+    apiBase:     { type: String },   // prefix for /api/* calls, default ''
+    siteBase:    { type: String },   // prefix for item links, default 'https://openlibrary.org'
+    placeholder: { type: String },   // input placeholder text
 
     _q:               { state: true },
     _suggestions:     { state: true },
@@ -43,16 +44,18 @@ export class OlSearchBar extends LitElement {
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
     _facetsLoading:   { state: true },
+    _acFocusIdx:      { state: true },  // keyboard-focused autocomplete result index
   };
 
   constructor() {
     super();
-    this.q          = '';
-    this.chips      = [];
-    this.showFacets = false;
-    this.filters    = { ...EMPTY_FILTERS };
-    this.apiBase    = '';
-    this.siteBase   = 'https://openlibrary.org';
+    this.q           = '';
+    this.chips       = [];
+    this.showFacets  = false;
+    this.filters     = { ...EMPTY_FILTERS };
+    this.apiBase     = '';
+    this.siteBase    = 'https://openlibrary.org';
+    this.placeholder = 'Search books, authors…';
 
     this._q             = '';
     this._suggestions   = [];
@@ -69,9 +72,13 @@ export class OlSearchBar extends LitElement {
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
     this._facetsLoading   = false;
+    this._acFocusIdx      = -1;
     this._authorTimer     = null;
     this._subjectTimer    = null;
     this._acAbort         = null;   // AbortController for in-flight autocomplete fetch
+    this._authorAbort     = null;   // AbortController for author search
+    this._subjectAbort    = null;   // AbortController for subject search
+    this._lastFacetBtn    = null;   // button that opened the current facet dropdown (for focus return)
 
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) {
@@ -93,6 +100,8 @@ export class OlSearchBar extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
     this._acAbort?.abort();
+    this._authorAbort?.abort();
+    this._subjectAbort?.abort();
     clearTimeout(this._timer);
     clearTimeout(this._authorTimer);
     clearTimeout(this._subjectTimer);
@@ -106,6 +115,10 @@ export class OlSearchBar extends LitElement {
     // In droppable mode _localFilters is owned locally and never overwritten by the prop.
     if (!this.showFacets && changed.has('filters') && this.filters) {
       this._localFilters = { ...this.filters };
+    }
+    // Return focus to the facet button that opened the dropdown when it closes.
+    if (changed.has('_openFacet') && changed.get('_openFacet') !== null && this._openFacet === null) {
+      this._lastFacetBtn?.focus();
     }
   }
 
@@ -159,18 +172,50 @@ export class OlSearchBar extends LitElement {
       const d = await (await fetch(`${this.apiBase}/api/search?${p}`, { signal })).json();
       this._suggestions = d.docs ?? [];
       this._total       = d.num_found ?? 0;
+      this._acFocusIdx  = -1;
     } catch (err) {
       if (err.name !== 'AbortError') {
-        this._suggestions = []; this._total = 0;
+        this._suggestions = []; this._total = 0; this._acFocusIdx = -1;
       }
     } finally {
       if (!signal.aborted) this._loading = false;
     }
   }
 
+  _clearInput() {
+    this._acAbort?.abort();
+    clearTimeout(this._timer);
+    this._q           = '';
+    this._suggestions = [];
+    this._total       = 0;
+    this._acFocusIdx  = -1;
+    this._loading     = false;
+    this.shadowRoot?.querySelector('.text-input')?.focus();
+  }
+
   _onKeyDown(e) {
-    if (e.key === 'Escape') { this._open = false; this._openFacet = null; return; }
-    if (e.key === 'Enter')  this._submit();
+    if (e.key === 'Escape') {
+      this._open = false; this._openFacet = null; this._acFocusIdx = -1; return;
+    }
+    // Arrow navigation through autocomplete results.
+    if (this._open && this._suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        this._acFocusIdx = Math.min(this._acFocusIdx + 1, this._suggestions.length - 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._acFocusIdx = Math.max(this._acFocusIdx - 1, -1);
+        return;
+      }
+      if (e.key === 'Enter' && this._acFocusIdx >= 0) {
+        e.preventDefault();
+        this.shadowRoot?.querySelectorAll('.ac-row')?.[this._acFocusIdx]?.click();
+        return;
+      }
+    }
+    if (e.key === 'Enter') this._submit();
   }
 
   _submit() {
@@ -215,6 +260,7 @@ export class OlSearchBar extends LitElement {
 
   _toggleFacet(name, e) {
     e.stopPropagation();
+    if (this._openFacet !== name) this._lastFacetBtn = e.currentTarget;
     this._openFacet = this._openFacet === name ? null : name;
   }
 
@@ -224,30 +270,40 @@ export class OlSearchBar extends LitElement {
 
   _onDropAuthorSearch(e) {
     clearTimeout(this._authorTimer);
+    this._authorAbort?.abort();
     const q = e.detail.q;
-    if (q.trim().length < 2) { this._authorResults = []; return; }
+    if (q.trim().length < 2) { this._authorResults = []; this._facetsLoading = false; return; }
     this._facetsLoading = true;
+    this._authorAbort = new AbortController();
+    const { signal } = this._authorAbort;
     this._authorTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
+        const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
         this._authorResults = d.docs ?? [];
+      } catch (err) {
+        if (err.name !== 'AbortError') this._authorResults = [];
       } finally {
-        this._facetsLoading = false;
+        if (!signal.aborted) this._facetsLoading = false;
       }
     }, 250);
   }
 
   _onDropSubjectSearch(e) {
     clearTimeout(this._subjectTimer);
+    this._subjectAbort?.abort();
     const q = e.detail.q;
-    if (q.trim().length < 2) { this._subjectResults = []; return; }
+    if (q.trim().length < 2) { this._subjectResults = []; this._facetsLoading = false; return; }
     this._facetsLoading = true;
+    this._subjectAbort = new AbortController();
+    const { signal } = this._subjectAbort;
     this._subjectTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
+        const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
         this._subjectResults = d.docs ?? [];
+      } catch (err) {
+        if (err.name !== 'AbortError') this._subjectResults = [];
       } finally {
-        this._facetsLoading = false;
+        if (!signal.aborted) this._facetsLoading = false;
       }
     }, 250);
   }
@@ -375,6 +431,15 @@ export class OlSearchBar extends LitElement {
     .pf-btn.active { color:hsl(202,96%,28%); font-weight:600; }
     .pf-caret { font-size:8px; opacity:.5; flex-shrink:0; }
 
+    /* Clear input button */
+    .clear-btn {
+      flex-shrink:0; background:none; border:none; cursor:pointer;
+      padding:2px 4px; color:hsl(0,0%,55%); font-size:16px; line-height:1;
+      border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+      transition:color .1s, background .1s;
+    }
+    .clear-btn:hover { color:hsl(0,0%,20%); background:hsl(0,0%,93%); }
+
     /* Autocomplete results */
     .ac-scroll { max-height:280px; overflow-y:auto; }
     .ac-spin, .ac-hint-msg, .ac-empty {
@@ -385,7 +450,8 @@ export class OlSearchBar extends LitElement {
       text-decoration:none; border-bottom:1px solid hsl(0,0%,94%);
       transition:background .1s; cursor:pointer; color:inherit;
     }
-    .ac-row:hover { background:hsl(0,0%,97%); }
+    .ac-row:hover, .ac-row.focused { background:hsl(0,0%,97%); }
+    .ac-row.focused { outline:2px solid hsl(202,96%,37%); outline-offset:-2px; }
     .ac-row:last-of-type { border-bottom:none; }
     .ac-cover {
       width:36px; height:54px; object-fit:cover; border-radius:3px;
@@ -469,6 +535,7 @@ export class OlSearchBar extends LitElement {
     return html`
       <div class="pf-wrap ${extraClass}">
         <button class="pf-btn ${this._isFacetActive(name) ? 'active' : ''}"
+                aria-expanded=${this._openFacet === name ? 'true' : 'false'}
                 @click=${e => this._toggleFacet(name, e)}>
           ${this._facetLabel(name)}<span class="pf-caret">▾</span>
         </button>
@@ -535,15 +602,22 @@ export class OlSearchBar extends LitElement {
         <div class="input-row">
           <div class="input-controls">
             <input class="text-input" type="text" autocomplete="off"
-                   placeholder="Search books, authors…" .value=${this._q}
+                   placeholder="${this.placeholder}" .value=${this._q}
                    role="combobox"
-                   aria-label="Search books and authors"
+                   aria-label="${this.placeholder}"
                    aria-expanded=${this._open && this.showFacets ? 'true' : 'false'}
                    aria-autocomplete="list"
                    aria-haspopup="listbox"
+                   aria-controls="ac-listbox"
+                   aria-activedescendant=${this._acFocusIdx >= 0 ? `ac-opt-${this._acFocusIdx}` : nothing}
                    @focus=${this._onFocus}
                    @input=${this._onInput}
                    @keydown=${this._onKeyDown}>
+
+            ${this._q ? html`
+              <button class="clear-btn" aria-label="Clear search"
+                      @click=${e => { e.stopPropagation(); this._clearInput(); }}>✕</button>
+            ` : ''}
 
             <button class="submit" @click=${this._submit} aria-label="Search">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -569,10 +643,10 @@ export class OlSearchBar extends LitElement {
             ${this._renderFacetBar(!this._loading && !showResults)}
 
             ${this._loading ? html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>` : showResults ? html`
-              <div class="ac-scroll" role="listbox" aria-label="Search suggestions">
+              <div class="ac-scroll" id="ac-listbox" role="listbox" aria-label="Search suggestions">
                 ${this._suggestions.length === 0
-                  ? html`<div class="ac-empty">No results</div>`
-                  : this._suggestions.map(w => {
+                  ? html`<div class="ac-empty" aria-live="polite">No results</div>`
+                  : this._suggestions.map((w, idx) => {
                       const ed = bestEdition(w.editions);
                       const coverId = ed?.cover_i ?? w.cover_i;
                       const edOlid  = ed?.key?.split('/').pop();
@@ -585,7 +659,9 @@ export class OlSearchBar extends LitElement {
                                   : null;
                       const isReadable = access === 'public' || access === 'borrowable';
                       return html`
-                        <a class="ac-row" href="${this.siteBase}${linkKey}"
+                        <a class="ac-row ${this._acFocusIdx === idx ? 'focused' : ''}"
+                           id="ac-opt-${idx}"
+                           href="${this.siteBase}${linkKey}"
                            target="_blank" rel="noopener"
                            role="option"
                            @click=${() => this._open = false}>
@@ -619,7 +695,7 @@ export class OlSearchBar extends LitElement {
                   }));
                 }}>See all ${this._total.toLocaleString()} results →</button>
               </div>
-            ` : html`<div class="ac-hint-msg">Start typing to search, or pick a filter above…</div>`}
+            ` : html`<div class="ac-hint-msg" aria-live="polite">Start typing to search, or pick a filter above…</div>`}
           </div>` : ''}
       </div>
     `;

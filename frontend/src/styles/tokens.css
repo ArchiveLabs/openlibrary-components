@@ -26,9 +26,15 @@
   --chip-genre-bg:    hsl(270, 45%, 92%);
   --chip-genre-text:  hsl(270, 45%, 30%);
   --chip-genre-border:hsl(270, 45%, 76%);
+  --chip-fiction-bg:   hsl(270, 45%, 92%);
+  --chip-fiction-text: hsl(270, 45%, 30%);
+  --chip-fiction-border:hsl(270, 45%, 76%);
   --chip-author-bg:   hsl(25, 80%, 92%);
   --chip-author-text: hsl(25, 80%, 28%);
   --chip-author-border:hsl(25, 80%, 72%);
+  --chip-subject-bg:  hsl(340, 60%, 92%);
+  --chip-subject-text:hsl(340, 60%, 28%);
+  --chip-subject-border:hsl(340, 60%, 76%);
 
   /* Badge colors for ebook access */
   --badge-readable-bg:    hsl(142, 50%, 91%);

@@ -1,10 +1,12 @@
-# openlibrary-lite
+# openlibrary-components
 
-A fast, modern playground UI for the [Open Library](https://openlibrary.org) catalog, built with FastAPI + Lit web components.
+Composable, drop-in Lit web components for [Open Library](https://openlibrary.org), backed by a FastAPI dev server for local testing and preview.
 
-**Purpose:** Prototype new UX patterns for search, filtering, and book discovery — with the goal of eventually upstreaming improvements to the main Open Library codebase.
+**Purpose:** Build and iterate on reusable UI components — search, filtering, book display — with the goal of upstreaming them into openlibrary.org.
 
-> **For agents and contributors:** Every significant subsystem has its own README. You are expected to read subsystem READMEs before making changes to those areas. See the index below. This main README contains only the things every contributor must know; subsystem-specific conventions and architecture live closer to the code.
+**Repo:** [github.com/ArchiveLabs/openlibrary-components](https://github.com/ArchiveLabs/openlibrary-components)
+
+> **For agents and contributors:** Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the component contract and design-system rules. Every significant subsystem also has its own README. This main README contains only the things every contributor must know.
 
 ---
 
@@ -16,7 +18,7 @@ make dev          # starts both Vite (port 8090) and FastAPI (port 8000)
 make up           # Docker Compose (production-like)
 ```
 
-Open http://localhost:8090. Vite proxies `/api/*` requests to FastAPI at port 8000.
+Open http://localhost:8090 for the OL composition, or http://localhost:8090/catalog.html for the component catalog. Vite proxies `/api/*` requests to FastAPI at port 8000.
 
 ## Stack
 
@@ -45,23 +47,42 @@ make up              # Docker Compose
 
 ## Architecture at a Glance
 
+Three layers, each with a clear responsibility:
+
+```
+Design System  frontend/src/styles/tokens.css
+               CSS custom properties — colors, spacing, type, radii.
+               All new components use these; existing ones migrate incrementally.
+
+Components     frontend/src/components/
+               Self-contained Lit web components. Drop any one into openlibrary.org.
+               Each has a README entry, a catalog story, and Vitest-tested pure logic.
+
+Compositions   frontend/index.html   — OL shell (topbar + header + body + footer)
+               frontend/catalog.html — component preview catalog (/catalog.html in dev)
+```
+
 ```
 /
 ├── backend/
-│   └── main.py          # FastAPI: /api/search, /api/authors/search, /api/subjects/search
+│   └── main.py          # FastAPI proxy: /api/search, /api/authors/search, etc.
 ├── frontend/
+│   ├── index.html        # OL composition entry
+│   ├── catalog.html      # Component catalog entry
 │   └── src/
-│       ├── main.js       # Lit app entry point
-│       ├── components/   # Lit web components  ← has its own README
-│       ├── utils/        # Pure JS utilities   ← has its own README
-│       └── styles/       # Global CSS
-├── docs/                 # Design decisions and specs
+│       ├── main.js       # OL composition script
+│       ├── catalog.js    # Catalog script
+│       ├── components/   # Lit web components  ← see README.md
+│       ├── utils/        # Pure JS utilities   ← see README.md
+│       └── styles/       # tokens.css, global.css, catalog.css
+├── docs/
 │   └── filter-semantics.md
+├── CONTRIBUTING.md       # Component contract, design-system rules, PR process
 ├── Makefile
 └── docker-compose.yml
 ```
 
-The frontend is a single-page app. All search state lives in `ol-search-page`. The backend is a thin proxy that translates filter params into OL Solr query syntax.
+The backend is a thin FastAPI proxy that translates filter params into OL Solr query syntax.
 
 ## Subsystem READMEs
 
