@@ -340,7 +340,7 @@ export class OlSearchBar extends LitElement {
   static styles = css`
     :host { display: block; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
-    .search-outer { position: relative; z-index: 10; }
+    .search-outer { position: relative; }
 
     /* Input row: text input + submit + scanner */
     .input-row {
