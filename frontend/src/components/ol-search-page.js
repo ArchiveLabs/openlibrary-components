@@ -128,6 +128,20 @@ export class OlSearchPage extends LitElement {
     if (q) { this._lastQ = q; this._runSearch(1); }
   }
 
+  async firstUpdated() {
+    // b/olid/ is indexed by edition OLID, not work OLID — fetch numeric cover IDs instead
+    const updated = await Promise.all(
+      this._showcaseBooks.map(async b => {
+        try {
+          const d = await (await fetch(`https://openlibrary.org/works/${b.olid}.json`)).json();
+          const coverId = d.covers?.[0] ?? null;
+          return coverId ? { ...b, coverId } : b;
+        } catch { return b; }
+      })
+    );
+    this._showcaseBooks = updated;
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
@@ -172,6 +186,18 @@ export class OlSearchPage extends LitElement {
   // ── Search ────────────────────────────────────────────────────
   _onSearch(e) {
     this._lastQ = e.detail?.q ?? '';
+    // When transitioning from droppable → search page, carry over any filters
+    // the user set in the droppable so the results match what was shown in autocomplete.
+    const f = e.detail?.filters;
+    if (f) {
+      this._sort          = f.sort          ?? EMPTY_FILTERS.sort;
+      this._availability  = f.availability  ?? EMPTY_FILTERS.availability;
+      this._fictionFilter = f.fictionFilter ?? EMPTY_FILTERS.fictionFilter;
+      this._languages     = [...(f.languages ?? [])];
+      this._genres        = [...(f.genres    ?? [])];
+      this._authors       = [...(f.authors   ?? [])];
+      this._subjects      = [...(f.subjects  ?? [])];
+    }
     const url = new URL(location.href);
     url.searchParams.set('q', this._lastQ);
     history.replaceState({}, '', url.toString());
@@ -700,7 +726,9 @@ export class OlSearchPage extends LitElement {
         <div class="cover-grid">
           ${this._showcaseBooks.map(b => html`
             <a class="cover-item" href=${b.href} target="_blank" rel="noopener" title=${b.title}>
-              <img src="https://covers.openlibrary.org/b/olid/${b.olid}-M.jpg"
+              <img src="${b.coverId
+                  ? `https://covers.openlibrary.org/b/id/${b.coverId}-M.jpg`
+                  : `https://covers.openlibrary.org/b/olid/${b.olid}-M.jpg`}"
                    alt=${b.title} loading="lazy">
             </a>`)}
         </div>`;
@@ -711,7 +739,7 @@ export class OlSearchPage extends LitElement {
         <ol-search-bar
           .q=${this._lastQ ?? ''}
           .chips=${this._chips}
-          .noPanel=${true}
+          .filters=${this._filters}
         ></ol-search-bar>
 
         <div class="results-body">

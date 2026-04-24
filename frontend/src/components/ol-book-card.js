@@ -1,10 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import { bestEdition } from '../utils/filters.js';
 
+// readable = ebook_access:[borrowable TO public]; printdisabled is not borrowable
 const ACCESS_META = {
   public:        { label: 'Readable',   cls: 'readable'   },
   borrowable:    { label: 'Borrowable', cls: 'borrowable' },
-  printdisabled: { label: 'Open',       cls: 'open'       },
+  printdisabled: { label: 'Catalog',    cls: 'catalog'    },
   no_ebook:      { label: 'Catalog',    cls: 'catalog'    },
 };
 
@@ -129,14 +130,21 @@ export class OlBookCard extends LitElement {
   render() {
     const w = this.work ?? {};
     const ed      = bestEdition(w.editions);
+    // Prefer edition title (correct language); fall back to work title
+    const title   = ed?.title ?? w.title;
     const coverId = ed?.cover_i ?? w.cover_i;
+    // Prefer edition OLID from key for covers; b/olid/ is indexed by edition, not work
+    const edOlid  = ed?.key?.split('/').pop();
+    const wOlid   = w.key?.split('/').pop();
     // Link to the best edition page; fall back to work page
     const linkKey = ed?.key ?? w.key;
-    const coverUrl = coverId
-      ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
-      : null;
+    const coverUrl = edOlid  ? `https://covers.openlibrary.org/b/olid/${edOlid}-M.jpg`
+                   : coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`
+                   : wOlid   ? `https://covers.openlibrary.org/b/olid/${wOlid}-M.jpg`
+                   : null;
     const itemUrl  = `https://openlibrary.org${linkKey}`;
     const authors  = (w.author_name ?? []).slice(0, 2).join(', ') || 'Unknown author';
+    // Use edition's own ebook_access for the badge (not the work-level rollup)
     const access   = ACCESS_META[ed?.ebook_access ?? w.ebook_access];
     const rating   = w.ratings_average;
     const ratingCount = w.ratings_count;
@@ -153,7 +161,7 @@ export class OlBookCard extends LitElement {
         <div class="body">
           ${series ? html`<p class="series">${series}</p>` : ''}
           <p class="title">
-            <a href=${itemUrl} target="_blank" rel="noopener">${w.title ?? 'Untitled'}</a>
+            <a href=${itemUrl} target="_blank" rel="noopener">${title ?? 'Untitled'}</a>
           </p>
           <p class="author">${authors}</p>
           <div class="meta">

@@ -38,12 +38,10 @@ async def search(
         else:
             q_parts.append("(" + " OR ".join(f'author:"{a}"' for a in author) + ")")
 
-    # OR multiple genres (mapped to OL subject field)
+    # AND multiple genres — each must match (subject:"a" AND subject:"b")
     if genres:
-        if len(genres) == 1:
-            q_parts.append(f'subject:"{genres[0]}"')
-        else:
-            q_parts.append("(" + " OR ".join(f'subject:"{g}"' for g in genres) + ")")
+        for genre in genres:
+            q_parts.append(f'subject:"{genre}"')
 
     # Subjects are OR'd
     if subjects:
@@ -57,14 +55,15 @@ async def search(
         q_parts.append(f'subject:"{fiction_filter}"')
 
     params: dict = {
-        "q": " ".join(q_parts) or "*",
+        "q": " ".join(q_parts),  # may be empty; fallback added after filters are resolved
         "page": page,
         "limit": limit,
+        # 'editions' (bare keyword) triggers OL's Solr block-join inner-hits;
+        # the edition sub-docs automatically inherit the work-level fields requested above.
         "fields": (
             "key,title,author_name,cover_i,first_publish_year,"
             "ratings_average,ratings_count,ebook_access,subject,series,"
-            "editions.key,editions.title,editions.language,"
-            "editions.ebook_access,editions.cover_i"
+            "editions"
         ),
     }
 
@@ -75,14 +74,28 @@ async def search(
     # httpx handles list values as repeated params automatically
     lang_list = language or []
 
-    # Availability maps to OL ebook_access / has_fulltext
+    # Availability: the 'ebook_access' URL param (not embedded in q) is what triggers
+    # OL's Solr block-join inner-hits so editions.docs gets populated in the response.
+    # 'readable' maps to borrowable (covers IA lending library, the vast majority of cases).
     if availability == "readable":
-        # OL ebook_access is a numeric enum: no_ebook=0, printdisabled=1, borrowable=2, public=3
-        # Range [borrowable TO public] = [2,3], correctly excludes printdisabled
-        q_parts.append("ebook_access:[borrowable TO public]")
-        params["q"] = " ".join(q_parts) or "*"
-    elif availability in ("open", "borrowable", "printdisabled"):
+        params["ebook_access"] = "borrowable"
+    elif availability == "open":
+        params["ebook_access"] = "public"  # OL enum: 'public', not 'open'
+    elif availability in ("borrowable", "printdisabled"):
         params["ebook_access"] = availability
+
+    # OL's Solr rejects empty q and q=* — for filter-only browsing, embed the most
+    # specific active constraint into q so the query is valid and returns results.
+    if not params["q"]:
+        if lang_list:
+            if len(lang_list) == 1:
+                params["q"] = f"language:{lang_list[0]}"
+            else:
+                params["q"] = "(" + " OR ".join(f"language:{l}" for l in lang_list) + ")"
+        elif "ebook_access" in params:
+            params["q"] = f"ebook_access:{params['ebook_access']}"
+        else:
+            params["q"] = "_exists_:key"
 
     async with httpx.AsyncClient() as client:
         resp = await client.get(
