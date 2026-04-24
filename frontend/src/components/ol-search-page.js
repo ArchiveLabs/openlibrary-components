@@ -443,6 +443,15 @@ export class OlSearchPage extends LitElement {
     .page-btn:hover:not(:disabled) { border-color:hsl(202,96%,37%); color:hsl(202,96%,28%); }
     .page-btn:disabled { opacity:.35; cursor:default; }
     .page-info { font-size:13px; color:hsl(0,0%,45%); }
+
+    @media (max-width: 600px) {
+      .cover-grid { gap: 10px; padding: 32px 0 28px; }
+      .cover-item img { width: 70px; height: 105px; }
+      .rf-bar { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+      .rf-bar::-webkit-scrollbar { display: none; }
+      .rf-count { min-width: 60px; padding: 0 10px; font-size: 12px; }
+      .rf-btn { min-width: 72px; font-size: 11px; }
+    }
   `;
 
   // ── Results filter bar render ─────────────────────────────────

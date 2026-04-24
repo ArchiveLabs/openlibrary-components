@@ -35,6 +35,9 @@ export class OlTopbar extends LitElement {
       height: 12px;
       background: hsl(0, 0%, 28%);
     }
+    @media (max-width: 600px) {
+      :host { display: none; }
+    }
   `;
 
   render() {

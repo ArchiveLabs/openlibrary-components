@@ -31,3 +31,7 @@ a {
 }
 
 a:hover { color: var(--dark-blue); }
+
+@media (max-width: 600px) {
+  main { padding: var(--space-sm) var(--space-md); }
+}
