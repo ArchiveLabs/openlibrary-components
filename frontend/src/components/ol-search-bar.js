@@ -669,7 +669,7 @@ export class OlSearchBar extends LitElement {
                             ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
                             : html`<div class="ac-blank">📖</div>`}
                           <div class="ac-body">
-                            <div class="ac-title">${w.title}</div>
+                            <div class="ac-title">${ed?.title ?? w.title}</div>
                             <div class="ac-author">${(w.author_name ?? []).slice(0,2).join(', ')}</div>
                             ${w.first_publish_year ? html`<div class="ac-year">${w.first_publish_year}</div>` : ''}
                           </div>
