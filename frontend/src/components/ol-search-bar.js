@@ -429,7 +429,8 @@ export class OlSearchBar extends LitElement {
     }
     .pf-btn:hover  { background:hsl(0,0%,95%); color:hsl(202,96%,28%); }
     .pf-btn.active { color:hsl(202,96%,28%); font-weight:600; }
-    .pf-caret { font-size:8px; opacity:.5; flex-shrink:0; }
+    .pf-caret { font-size:10px; opacity:.5; flex-shrink:0; }
+    .pf-sort-icon { font-size:11px; opacity:.7; flex-shrink:0; }
 
     /* Clear input button */
     .clear-btn {
@@ -537,7 +538,7 @@ export class OlSearchBar extends LitElement {
         <button class="pf-btn ${this._isFacetActive(name) ? 'active' : ''}"
                 aria-expanded=${this._openFacet === name ? 'true' : 'false'}
                 @click=${e => this._toggleFacet(name, e)}>
-          ${this._facetLabel(name)}<span class="pf-caret">▾</span>
+          ${name === 'sort' ? html`<span class="pf-sort-icon" aria-hidden="true">⇅</span>` : ''}${this._facetLabel(name)}<span class="pf-caret">▾</span>
         </button>
         ${this._openFacet === name ? html`
           <ol-facet-drop
