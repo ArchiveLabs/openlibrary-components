@@ -1,11 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import {
-  SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
-  FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
-  EMPTY_FILTERS, toggleArrayValue, shufflePick, bestEdition,
+  POPULAR_AUTHORS, POPULAR_SUBJECTS,
+  EMPTY_FILTERS, shufflePick, bestEdition,
   getSortLabel, buildChips,
 } from '../utils/filters.js';
 import './ol-howto-modal.js';
+import './ol-facet-drop.js';
 
 /**
  * Unified search bar used in two modes:
@@ -27,6 +27,8 @@ export class OlSearchBar extends LitElement {
     chips:      { type: Array },
     showFacets: { type: Boolean },
     filters:    { type: Object },   // initial/external filter state
+    apiBase:    { type: String },   // prefix for /api/* calls, default ''
+    siteBase:   { type: String },   // prefix for item links, default 'https://openlibrary.org'
 
     _q:               { state: true },
     _suggestions:     { state: true },
@@ -36,11 +38,7 @@ export class OlSearchBar extends LitElement {
     _localFilters:    { state: true },
     _openFacet:       { state: true },
     _howtoOpen:       { state: true },
-    _langSearch:      { state: true },
-    _genreSearch:     { state: true },
-    _authorSearch:    { state: true },
     _authorResults:   { state: true },
-    _subjectSearch:   { state: true },
     _subjectResults:  { state: true },
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
@@ -52,6 +50,8 @@ export class OlSearchBar extends LitElement {
     this.chips      = [];
     this.showFacets = false;
     this.filters    = { ...EMPTY_FILTERS };
+    this.apiBase    = '';
+    this.siteBase   = 'https://openlibrary.org';
 
     this._q             = '';
     this._suggestions   = [];
@@ -61,18 +61,14 @@ export class OlSearchBar extends LitElement {
     this._timer         = null;
     this._localFilters  = { ...EMPTY_FILTERS };
 
-    this._openFacet      = null;
-    this._howtoOpen      = false;
-    this._langSearch     = '';
-    this._genreSearch    = '';
-    this._authorSearch   = '';
-    this._authorResults  = [];
-    this._subjectSearch  = '';
-    this._subjectResults = [];
+    this._openFacet       = null;
+    this._howtoOpen       = false;
+    this._authorResults   = [];
+    this._subjectResults  = [];
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
-    this._authorTimer    = null;
-    this._subjectTimer   = null;
+    this._authorTimer     = null;
+    this._subjectTimer    = null;
 
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) {
@@ -148,7 +144,7 @@ export class OlSearchBar extends LitElement {
       for (const v of f.genres    ?? []) p.append('genres',   v);
       for (const v of f.authors   ?? []) p.append('author',   v);
       for (const v of f.subjects  ?? []) p.append('subjects', v);
-      const d = await (await fetch(`/api/search?${p}`)).json();
+      const d = await (await fetch(`${this.apiBase}/api/search?${p}`)).json();
       this._suggestions = d.docs ?? [];
       this._total       = d.num_found ?? 0;
     } catch {
@@ -208,22 +204,26 @@ export class OlSearchBar extends LitElement {
     this._openFacet = this._openFacet === name ? null : name;
   }
 
-  _onAuthorSearch(e) {
-    this._authorSearch = e.target.value;
+  _onDropFacetChange(e) {
+    this._emitFilter(e.detail.filter, e.detail.value, e.detail.keepOpen);
+  }
+
+  _onDropAuthorSearch(e) {
     clearTimeout(this._authorTimer);
-    if (this._authorSearch.trim().length < 2) { this._authorResults = []; return; }
+    const q = e.detail.q;
+    if (q.trim().length < 2) { this._authorResults = []; return; }
     this._authorTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/authors/search?q=${encodeURIComponent(this._authorSearch.trim())}&limit=8`)).json();
+      const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
       this._authorResults = d.docs ?? [];
     }, 250);
   }
 
-  _onSubjectSearch(e) {
-    this._subjectSearch = e.target.value;
+  _onDropSubjectSearch(e) {
     clearTimeout(this._subjectTimer);
-    if (this._subjectSearch.trim().length < 2) { this._subjectResults = []; return; }
+    const q = e.detail.q;
+    if (q.trim().length < 2) { this._subjectResults = []; return; }
     this._subjectTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/subjects/search?q=${encodeURIComponent(this._subjectSearch.trim())}&limit=8`)).json();
+      const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
       this._subjectResults = d.docs ?? [];
     }, 250);
   }
@@ -351,99 +351,6 @@ export class OlSearchBar extends LitElement {
     .pf-btn.active { color:hsl(202,96%,28%); font-weight:600; }
     .pf-caret { font-size:8px; opacity:.5; flex-shrink:0; }
 
-    /* Facet dropdown */
-    .pf-drop {
-      position:absolute; top:calc(100% + 2px); left:0;
-      min-width:210px; background:white;
-      border:1px solid hsl(0,0%,82%); border-radius:8px;
-      box-shadow:0 6px 20px rgba(0,0,0,.14);
-      z-index:700; overflow:hidden;
-    }
-    .pf-drop.right { left:auto; right:0; }
-    .pf-drop--avail { min-width:300px; }
-    .pf-drop--avail .pf-item { padding:10px 14px; align-items:flex-start; }
-    .pf-drop--avail .pf-drop-scroll { max-height:none; }
-
-    /* GitHub-style search input inside dropdown */
-    .pf-search-wrap {
-      position:relative; border-bottom:1px solid hsl(0,0%,90%);
-    }
-    .pf-search-icon {
-      position:absolute; left:10px; top:50%; transform:translateY(-50%);
-      color:hsl(0,0%,58%); pointer-events:none;
-    }
-    .pf-search {
-      border:none; padding:8px 12px 8px 30px;
-      font-size:12px; font-family:inherit; width:100%;
-      box-sizing:border-box; outline:none; color:hsl(0,0%,15%); background:transparent;
-    }
-    .pf-search::placeholder { color:hsl(0,0%,58%); }
-
-    /* Search row with dice button (author/subject) */
-    .pf-search-row {
-      position:relative; display:flex; align-items:stretch;
-      border-bottom:1px solid hsl(0,0%,90%);
-    }
-    .pf-search-inline {
-      flex:1; border:none; padding:8px 12px 8px 30px; font-size:12px;
-      font-family:inherit; outline:none; color:hsl(0,0%,15%); background:transparent;
-    }
-    .pf-search-inline::placeholder { color:hsl(0,0%,58%); }
-    .pf-dice {
-      padding:4px 9px; border:none; border-left:1px solid hsl(0,0%,90%);
-      background:transparent; cursor:pointer; font-size:15px; flex-shrink:0; line-height:1;
-    }
-    .pf-dice:hover { background:hsl(0,0%,96%); }
-    .pf-dice-icon { display:inline-block; transition:transform .2s; }
-    .pf-dice:hover .pf-dice-icon { transform:rotate(120deg); }
-
-    /* GitHub-style section headers */
-    .pf-section-hdr {
-      padding:5px 12px 4px; font-size:11px; font-weight:600; color:hsl(0,0%,40%);
-      background:hsl(0,0%,98%); border-bottom:1px solid hsl(0,0%,93%);
-      letter-spacing:0.03em; text-transform:uppercase;
-    }
-    .pf-section-sep { height:1px; background:hsl(0,0%,90%); }
-
-    .pf-drop-scroll { max-height:220px; overflow-y:auto; }
-
-    /* Fiction/Nonfiction pinned section */
-    .pf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
-    .pf-fiction-sep { height:1px; background:hsl(0,0%,88%); }
-
-    /* Availability body */
-    .pf-avail-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-    .pf-avail-sub { font-size:11px; color:hsl(0,0%,55%); font-weight:normal; line-height:1.35; }
-    .pf-avail-sub a { color:hsl(202,96%,37%); text-decoration:none; }
-    .pf-avail-sub a:hover { text-decoration:underline; }
-
-    .pf-item {
-      display:flex; align-items:center; gap:8px;
-      padding:7px 12px; font-size:12px; font-family:inherit;
-      color:hsl(0,0%,20%); cursor:pointer; border:none;
-      background:transparent; width:100%; text-align:left; transition:background .07s;
-    }
-    .pf-item:hover { background:hsl(202,96%,96%); color:hsl(202,96%,28%); }
-    .pf-item.selected { background:hsl(202,96%,97%); font-weight:600; color:hsl(202,96%,28%); }
-    .pf-item input[type="checkbox"], .pf-item input[type="radio"] {
-      accent-color:hsl(202,96%,37%); flex-shrink:0; cursor:pointer;
-    }
-    .pf-count { margin-left:auto; font-size:11px; color:hsl(0,0%,55%); }
-    .pf-empty { padding:10px 12px; font-size:12px; color:hsl(0,0%,55%); text-align:center; }
-    .pf-hint { padding:6px 12px; font-size:11px; color:hsl(0,0%,55%); font-style:italic; }
-
-    /* Sticky footer + destructive clear button */
-    .pf-drop-footer {
-      border-top:1px solid hsl(0,0%,90%); background:white;
-      padding:5px 10px; display:flex; justify-content:flex-end;
-    }
-    .pf-clear {
-      font-size:11px; color:hsl(0,72%,38%); background:none; border:none;
-      cursor:pointer; padding:3px 8px; border-radius:4px; font-family:inherit;
-      font-weight:500; transition:background .1s;
-    }
-    .pf-clear:hover { background:hsl(0,72%,95%); }
-
     /* Autocomplete results */
     .ac-scroll { max-height:280px; overflow-y:auto; }
     .ac-spin, .ac-hint-msg, .ac-empty {
@@ -501,8 +408,6 @@ export class OlSearchBar extends LitElement {
       .pf-bar { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
       .pf-bar::-webkit-scrollbar { display: none; }
       .pf-btn { font-size: 10px; padding: 7px 3px; }
-      .pf-drop, .pf-drop.right { left: 0; right: auto; max-width: calc(100vw - 32px); }
-      .pf-drop--avail { min-width: min(300px, calc(100vw - 32px)); }
       .submit { padding: 6px 10px; }
       .ac-scroll { max-height: 220px; }
     }
@@ -543,237 +448,25 @@ export class OlSearchBar extends LitElement {
                 @click=${e => this._toggleFacet(name, e)}>
           ${this._facetLabel(name)}<span class="pf-caret">▾</span>
         </button>
-        ${this._openFacet === name ? this._renderDrop(name, right) : ''}
+        ${this._openFacet === name ? html`
+          <ol-facet-drop
+            .name=${name}
+            ?right=${right}
+            .filters=${this._localFilters}
+            .authorResults=${this._authorResults}
+            .subjectResults=${this._subjectResults}
+            .defaultAuthors=${this._defaultAuthors}
+            .defaultSubjects=${this._defaultSubjects}
+            @ol-facet-change=${this._onDropFacetChange}
+            @ol-facet-search-authors=${this._onDropAuthorSearch}
+            @ol-facet-search-subjects=${this._onDropSubjectSearch}
+            @ol-facet-shuffle-authors=${() => { this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}
+            @ol-facet-shuffle-subjects=${() => { this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}
+          ></ol-facet-drop>
+        ` : ''}
       </div>`;
   }
 
-  // ── Facet dropdown renderers ──────────────────────────────────
-  _renderDrop(name, right = false) {
-    const f = this._localFilters;
-    const cls = `pf-drop${right ? ' right' : ''}`;
-
-    if (name === 'sort') {
-      return html`<div class="${cls}">
-        <div class="pf-section-hdr">Sort by</div>
-        <div class="pf-drop-scroll">
-          ${SORT_OPTIONS.map(o => html`
-            <button class="pf-item ${f.sort === o.value ? 'selected' : ''}"
-                    @click=${() => this._emitFilter('sort', o.value)}>
-              <input type="radio" .checked=${f.sort === o.value} readonly> ${o.label}
-            </button>`)}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'avail') {
-      return html`<div class="${cls} pf-drop--avail">
-        <div class="pf-section-hdr">Availability</div>
-        <div class="pf-drop-scroll">
-          ${AVAILABILITY_OPTIONS.map(o => html`
-            <button class="pf-item ${f.availability === o.value ? 'selected' : ''}"
-                    @click=${() => this._emitFilter('availability', o.value)}>
-              <input type="radio" .checked=${f.availability === o.value} readonly>
-              <span class="pf-avail-body">
-                <span>${o.label}</span>
-                <span class="pf-avail-sub">
-                  ${(o.subParts ?? []).map(p => p.href
-                    ? html`<a href=${p.href} target="_blank" rel="noopener"
-                               @click=${e => e.stopPropagation()}>${p.text}</a>`
-                    : p.text)}
-                </span>
-              </span>
-              <span class="pf-count">${o.staticCount}</span>
-            </button>`)}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'lang') {
-      const selected  = f.languages ?? [];
-      const selOpts   = LANGUAGE_OPTIONS.filter(o => selected.includes(o.value));
-      const unselVisible = LANGUAGE_OPTIONS.filter(o =>
-        !selected.includes(o.value) &&
-        (!this._langSearch || o.label.toLowerCase().includes(this._langSearch.toLowerCase()))
-      );
-      return html`<div class="${cls}">
-        <div class="pf-search-wrap">
-          <svg class="pf-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          <input class="pf-search" placeholder="Filter languages…" .value=${this._langSearch}
-                 @input=${e => { this._langSearch = e.target.value; }}
-                 @click=${e => e.stopPropagation()}>
-        </div>
-        ${selOpts.length ? html`
-          <div class="pf-section-hdr">Selected</div>
-          ${selOpts.map(o => html`
-            <button class="pf-item selected"
-                @click=${() => this._emitFilter('languages', toggleArrayValue(selected, o.value), true)}>
-              <input type="checkbox" .checked=${true} readonly> ${o.label}
-            </button>`)}
-          <div class="pf-section-sep"></div>
-        ` : ''}
-        <div class="pf-section-hdr">${selOpts.length ? 'Suggestions' : 'Languages'}</div>
-        <div class="pf-drop-scroll">
-          ${unselVisible.length === 0 ? html`<div class="pf-empty">${this._langSearch ? 'No matches' : 'All selected'}</div>` : ''}
-          ${unselVisible.map(o => html`
-            <button class="pf-item"
-                @click=${() => this._emitFilter('languages', toggleArrayValue(selected, o.value), true)}>
-              <input type="checkbox" .checked=${false} readonly> ${o.label}
-            </button>`)}
-        </div>
-        ${selected.length ? html`
-          <div class="pf-drop-footer">
-            <button class="pf-clear" @click=${e => { e.stopPropagation(); this._emitFilter('languages', []); }}>Clear selections</button>
-          </div>` : ''}
-      </div>`;
-    }
-
-    if (name === 'genre') {
-      const selectedGenres = f.genres ?? [];
-      const selGenreOpts   = GENRE_OPTIONS.filter(o => selectedGenres.includes(o.value));
-      const unselVisible   = GENRE_OPTIONS.filter(o =>
-        !selectedGenres.includes(o.value) &&
-        (!this._genreSearch || o.label.toLowerCase().includes(this._genreSearch.toLowerCase()))
-      );
-      const hasAnySelection = selectedGenres.length > 0 || !!f.fictionFilter;
-
-      return html`<div class="${cls}">
-        <div class="pf-search-wrap">
-          <svg class="pf-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          <input class="pf-search" placeholder="Filter genres…" .value=${this._genreSearch}
-                 @input=${e => { this._genreSearch = e.target.value; }}
-                 @click=${e => e.stopPropagation()}>
-        </div>
-        <div class="pf-fiction-section">
-          ${FICTION_OPTIONS.map(o => html`
-            <button class="pf-item ${f.fictionFilter === o.value ? 'selected' : ''}"
-                    @click=${() => this._emitFilter('fictionFilter', f.fictionFilter === o.value ? '' : o.value, true)}>
-              <input type="checkbox" .checked=${f.fictionFilter === o.value} readonly> ${o.label}
-            </button>`)}
-        </div>
-        <div class="pf-fiction-sep"></div>
-        ${selGenreOpts.length ? html`
-          <div class="pf-section-hdr">Selected</div>
-          ${selGenreOpts.map(o => html`
-            <button class="pf-item selected"
-                @click=${() => this._emitFilter('genres', toggleArrayValue(selectedGenres, o.value), true)}>
-              <input type="checkbox" .checked=${true} readonly> ${o.label}
-            </button>`)}
-          <div class="pf-section-sep"></div>
-        ` : ''}
-        <div class="pf-section-hdr">${selGenreOpts.length ? 'Suggestions' : 'Genres'}</div>
-        <div class="pf-drop-scroll">
-          ${unselVisible.length === 0 ? html`<div class="pf-empty">${this._genreSearch ? 'No matches' : 'All selected'}</div>` : ''}
-          ${unselVisible.map(o => html`
-            <button class="pf-item"
-                @click=${() => this._emitFilter('genres', toggleArrayValue(selectedGenres, o.value), true)}>
-              <input type="checkbox" .checked=${false} readonly> ${o.label}
-            </button>`)}
-        </div>
-        ${hasAnySelection ? html`
-          <div class="pf-drop-footer">
-            <button class="pf-clear" @click=${e => {
-              e.stopPropagation();
-              this._emitFilter('genres', []);
-              this._emitFilter('fictionFilter', '', true);
-            }}>Clear selections</button>
-          </div>` : ''}
-      </div>`;
-    }
-
-    if (name === 'author') {
-      const searching       = this._authorSearch.trim().length >= 2;
-      const selectedAuthors = f.authors ?? [];
-      const suggestions     = searching ? this._authorResults : this._defaultAuthors;
-      const unselSuggestions = suggestions.map(a => typeof a === 'string' ? { name: a } : a)
-        .filter(a => !selectedAuthors.includes(a.name));
-
-      return html`<div class="${cls}">
-        <div class="pf-search-row">
-          <svg class="pf-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          <input class="pf-search-inline" placeholder="Search authors…" .value=${this._authorSearch}
-                 @input=${this._onAuthorSearch} @click=${e => e.stopPropagation()}>
-          <button class="pf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}>
-            <span class="pf-dice-icon">🎲</span></button>
-        </div>
-        ${selectedAuthors.length ? html`
-          <div class="pf-section-hdr">Selected</div>
-          ${selectedAuthors.map(name => html`
-            <button class="pf-item selected"
-                @click=${() => this._emitFilter('authors', toggleArrayValue(selectedAuthors, name), true)}>
-              <input type="checkbox" .checked=${true} readonly> ${name}
-            </button>`)}
-          <div class="pf-section-sep"></div>
-        ` : ''}
-        <div class="pf-section-hdr">${selectedAuthors.length ? 'Suggestions' : 'Authors'}</div>
-        <div class="pf-drop-scroll">
-          ${searching && this._authorResults.length === 0 ? html`<div class="pf-empty">No authors found</div>` : ''}
-          ${unselSuggestions.map(a => html`
-            <button class="pf-item"
-                @click=${() => this._emitFilter('authors', toggleArrayValue(selectedAuthors, a.name), true)}>
-              <input type="checkbox" .checked=${false} readonly>
-              ${a.name}
-              ${a.work_count ? html`<span class="pf-count">${a.work_count.toLocaleString()}</span>` : ''}
-            </button>`)}
-        </div>
-        ${selectedAuthors.length ? html`
-          <div class="pf-drop-footer">
-            <button class="pf-clear" @click=${e => { e.stopPropagation(); this._emitFilter('authors', []); }}>Clear selections</button>
-          </div>` : ''}
-      </div>`;
-    }
-
-    if (name === 'subject') {
-      const searching        = this._subjectSearch.trim().length >= 2;
-      const selectedSubjects = f.subjects ?? [];
-      const suggestions      = searching ? this._subjectResults : this._defaultSubjects;
-      const unselSuggestions  = suggestions.map(s => typeof s === 'string' ? { name: s } : s)
-        .filter(s => !selectedSubjects.includes(s.name));
-
-      return html`<div class="${cls}">
-        <div class="pf-search-row">
-          <svg class="pf-search-icon" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-          </svg>
-          <input class="pf-search-inline" placeholder="Search subjects…" .value=${this._subjectSearch}
-                 @input=${this._onSubjectSearch} @click=${e => e.stopPropagation()}>
-          <button class="pf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}>
-            <span class="pf-dice-icon">🎲</span></button>
-        </div>
-        ${selectedSubjects.length ? html`
-          <div class="pf-section-hdr">Selected</div>
-          ${selectedSubjects.map(name => html`
-            <button class="pf-item selected"
-                @click=${() => this._emitFilter('subjects', toggleArrayValue(selectedSubjects, name), true)}>
-              <input type="checkbox" .checked=${true} readonly> ${name}
-            </button>`)}
-          <div class="pf-section-sep"></div>
-        ` : ''}
-        <div class="pf-section-hdr">${selectedSubjects.length ? 'Suggestions' : 'Subjects'}</div>
-        <div class="pf-drop-scroll">
-          ${searching && this._subjectResults.length === 0 ? html`<div class="pf-empty">No subjects found</div>` : ''}
-          ${unselSuggestions.map(s => html`
-            <button class="pf-item"
-                @click=${() => this._emitFilter('subjects', toggleArrayValue(selectedSubjects, s.name), true)}>
-              <input type="checkbox" .checked=${false} readonly>
-              ${s.name}
-              ${s.work_count ? html`<span class="pf-count">${s.work_count.toLocaleString()}</span>` : ''}
-            </button>`)}
-        </div>
-        ${selectedSubjects.length ? html`
-          <div class="pf-drop-footer">
-            <button class="pf-clear" @click=${e => { e.stopPropagation(); this._emitFilter('subjects', []); }}>Clear selections</button>
-          </div>` : ''}
-      </div>`;
-    }
-  }
 
   // Order: avail → lang → genre → subject → author → sort → cog
   _renderFacetBar(roundBottom = false) {
@@ -828,10 +521,10 @@ export class OlSearchBar extends LitElement {
             </button>
             <span class="scan-sep"></span>
             <a class="scan-btn" title="Scan ISBN barcode"
-               href="https://openlibrary.org/barcodescanner?returnTo=/isbn/$$$"
+               href="${this.siteBase}/barcodescanner?returnTo=/isbn/$$$"
                target="_blank" rel="noopener"
                @click=${e => e.stopPropagation()}>
-              <img src="https://openlibrary.org/static/images/icons/barcode_scanner.svg"
+              <img src="${this.siteBase}/static/images/icons/barcode_scanner.svg"
                    alt="Scan barcode" width="18" height="18">
             </a>
           </div>
@@ -861,7 +554,7 @@ export class OlSearchBar extends LitElement {
                                   : null;
                       const isReadable = access === 'public' || access === 'borrowable';
                       return html`
-                        <a class="ac-row" href="https://openlibrary.org${linkKey}"
+                        <a class="ac-row" href="${this.siteBase}${linkKey}"
                            target="_blank" rel="noopener"
                            @click=${() => this._open = false}>
                           ${cover
@@ -883,7 +576,7 @@ export class OlSearchBar extends LitElement {
                         </a>`;})}
               </div>
               <div class="ac-foot">
-                <a class="ac-add-book" href="https://openlibrary.org/books/add"
+                <a class="ac-add-book" href="${this.siteBase}/books/add"
                    target="_blank" rel="noopener"
                    @click=${e => e.stopPropagation()}>+ Add Book</a>
                 <button class="ac-see-all" @click=${() => {

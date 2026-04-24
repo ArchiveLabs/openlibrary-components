@@ -1,12 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import './ol-search-bar.js';
 import './ol-book-card.js';
+import './ol-facet-drop.js';
 import './ol-howto-modal.js';
 import './ol-search-hint.js';
 import {
-  SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS,
-  FICTION_OPTIONS, POPULAR_AUTHORS, POPULAR_SUBJECTS,
-  EMPTY_FILTERS, toggleArrayValue, buildChips, buildSearchParams, shufflePick,
+  POPULAR_AUTHORS, POPULAR_SUBJECTS,
+  EMPTY_FILTERS, buildChips, buildSearchParams, shufflePick,
   getSortLabel,
 } from '../utils/filters.js';
 
@@ -64,11 +64,7 @@ export class OlSearchPage extends LitElement {
     // Results filter bar UI state
     _openFacet:       { state: true },
     _howtoOpen:       { state: true },
-    _langSearch:      { state: true },
-    _genreSearch:     { state: true },
-    _authorSearch:    { state: true },
     _authorResults:   { state: true },
-    _subjectSearch:   { state: true },
     _subjectResults:  { state: true },
     _facetsLoading:   { state: true },
     _defaultAuthors:  { state: true },
@@ -96,11 +92,7 @@ export class OlSearchPage extends LitElement {
 
     this._openFacet       = null;
     this._howtoOpen       = false;
-    this._langSearch      = '';
-    this._genreSearch     = '';
-    this._authorSearch    = '';
     this._authorResults   = [];
-    this._subjectSearch   = '';
     this._subjectResults  = [];
     this._facetsLoading   = false;
     this._defaultAuthors  = shufflePick(POPULAR_AUTHORS, 6);
@@ -301,7 +293,7 @@ export class OlSearchPage extends LitElement {
         this._facetsLoading = true;
         const data = await loadFacets(this._lastQ);
         this._facetsLoading = false;
-        if (data && !this._authorSearch) {
+        if (data) {
           const facets = data?.sidebar?.searchFacets?.facets ?? {};
           this._authorResults = (facets.author_key ?? []).slice(0, 10)
             .map(f => ({ name: f.name, work_count: f.count }));
@@ -311,7 +303,7 @@ export class OlSearchPage extends LitElement {
         this._facetsLoading = true;
         const data = await loadFacets(this._lastQ);
         this._facetsLoading = false;
-        if (data && !this._subjectSearch) {
+        if (data) {
           const facets = data?.sidebar?.searchFacets?.facets ?? {};
           this._subjectResults = (facets.subject_facet ?? []).slice(0, 10)
             .map(f => ({ name: f.name, work_count: f.count }));
@@ -334,22 +326,26 @@ export class OlSearchPage extends LitElement {
     this._runSearch(1);
   }
 
-  _onRFAuthorSearch(e) {
-    this._authorSearch = e.target.value;
+  _onRFDropFacetChange(e) {
+    this._rfApply(e.detail.filter, e.detail.value, e.detail.keepOpen);
+  }
+
+  _onRFDropAuthorSearch(e) {
     clearTimeout(this._authorTimer);
-    if (this._authorSearch.trim().length < 2) { this._authorResults = []; return; }
+    const q = e.detail.q;
+    if (q.trim().length < 2) { this._authorResults = []; return; }
     this._authorTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/authors/search?q=${encodeURIComponent(this._authorSearch.trim())}&limit=8`)).json();
+      const d = await (await fetch(`/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
       this._authorResults = d.docs ?? [];
     }, 250);
   }
 
-  _onRFSubjectSearch(e) {
-    this._subjectSearch = e.target.value;
+  _onRFDropSubjectSearch(e) {
     clearTimeout(this._subjectTimer);
-    if (this._subjectSearch.trim().length < 2) { this._subjectResults = []; return; }
+    const q = e.detail.q;
+    if (q.trim().length < 2) { this._subjectResults = []; return; }
     this._subjectTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/subjects/search?q=${encodeURIComponent(this._subjectSearch.trim())}&limit=8`)).json();
+      const d = await (await fetch(`/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
       this._subjectResults = d.docs ?? [];
     }, 250);
   }
@@ -404,66 +400,6 @@ export class OlSearchPage extends LitElement {
     .rf-btn:hover  { background:hsl(0,0%,97%); color:hsl(202,96%,28%); }
     .rf-btn.active { color:hsl(202,96%,28%); font-weight:600; }
     .rf-caret { font-size:8px; opacity:.5; flex-shrink:0; }
-
-    /* Dropdown from results filter bar */
-    .rf-drop {
-      position:absolute; top:calc(100% + 2px); left:0;
-      min-width:210px; background:white;
-      border:1px solid hsl(0,0%,82%); border-radius:8px;
-      box-shadow:0 6px 24px rgba(0,0,0,.13);
-      z-index:600; overflow:hidden;
-    }
-    .rf-drop.right { left:auto; right:0; }
-    .rf-drop-scroll { max-height:260px; overflow-y:auto; }
-    .rf-search {
-      border:none; border-bottom:1px solid hsl(0,0%,90%);
-      padding:8px 12px; font-size:12px; font-family:inherit;
-      width:100%; box-sizing:border-box; outline:none; color:hsl(0,0%,15%);
-    }
-    .rf-search::placeholder { color:hsl(0,0%,58%); }
-
-    /* Search row with dice in rf drops */
-    .rf-search-row { display:flex; align-items:stretch; border-bottom:1px solid hsl(0,0%,90%); }
-    .rf-search-inline {
-      flex:1; border:none; padding:8px 12px; font-size:12px;
-      font-family:inherit; outline:none; color:hsl(0,0%,15%); background:transparent;
-    }
-    .rf-search-inline::placeholder { color:hsl(0,0%,58%); }
-    .rf-dice {
-      padding:4px 9px; border:none; border-left:1px solid hsl(0,0%,90%);
-      background:transparent; cursor:pointer; font-size:15px; flex-shrink:0;
-      line-height:1;
-    }
-    .rf-dice:hover { background:hsl(0,0%,96%); }
-    .rf-dice-icon { display:inline-block; transition:transform .2s; }
-    .rf-dice:hover .rf-dice-icon { transform:rotate(120deg); }
-
-    /* Fiction pinned section in genre dropdown */
-    .rf-fiction-section { background:hsl(270,20%,97%); padding:2px 0; }
-    .rf-fiction-sep { height:1px; background:hsl(0,0%,88%); }
-
-    /* Availability item body — stacks label + sub vertically */
-    .rf-avail-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-    .rf-avail-sub {
-      font-size:11px; color:hsl(0,0%,55%); font-weight:normal; line-height:1.35;
-    }
-    .rf-avail-sub a { color:hsl(202,96%,37%); text-decoration:none; }
-    .rf-avail-sub a:hover { text-decoration:underline; }
-
-    .rf-item {
-      display:flex; align-items:center; gap:8px;
-      padding:7px 12px; font-size:13px; font-family:inherit;
-      color:hsl(0,0%,20%); cursor:pointer; border:none;
-      background:transparent; width:100%; text-align:left;
-      transition:background .07s;
-    }
-    .rf-item:hover { background:hsl(202,96%,96%); color:hsl(202,96%,28%); }
-    .rf-item.selected { font-weight:600; color:hsl(202,96%,28%); }
-    .rf-item input[type="checkbox"],
-    .rf-item input[type="radio"] { accent-color:hsl(202,96%,37%); flex-shrink:0; cursor:pointer; }
-    .rf-count-badge { margin-left:auto; font-size:11px; color:hsl(0,0%,50%); }
-    .rf-empty { padding:10px 12px; font-size:12px; color:hsl(0,0%,55%); text-align:center; }
-    .rf-hint  { padding:6px 12px; font-size:11px; color:hsl(0,0%,55%); font-style:italic; }
 
     /* Book list area */
     .results-inner { padding:0 20px; }
@@ -526,170 +462,24 @@ export class OlSearchPage extends LitElement {
                 @click=${e => this._toggleFacet(name, e)}>
           ${this._rfLabel(name)}<span class="rf-caret">▾</span>
         </button>
-        ${this._openFacet === name ? this._renderRFDrop(name, right) : ''}
+        ${this._openFacet === name ? html`
+          <ol-facet-drop
+            .name=${name}
+            ?right=${right}
+            .filters=${this._filters}
+            .authorResults=${this._authorResults}
+            .subjectResults=${this._subjectResults}
+            .defaultAuthors=${this._defaultAuthors}
+            .defaultSubjects=${this._defaultSubjects}
+            .facetsLoading=${this._facetsLoading}
+            @ol-facet-change=${this._onRFDropFacetChange}
+            @ol-facet-search-authors=${this._onRFDropAuthorSearch}
+            @ol-facet-search-subjects=${this._onRFDropSubjectSearch}
+            @ol-facet-shuffle-authors=${() => { this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}
+            @ol-facet-shuffle-subjects=${() => { this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}
+          ></ol-facet-drop>
+        ` : ''}
       </div>`;
-  }
-
-  _renderRFDrop(name, right = false) {
-    const cls = `rf-drop${right ? ' right' : ''}`;
-    if (name === 'sort') {
-      return html`<div class="${cls}"><div class="rf-drop-scroll">
-        ${SORT_OPTIONS.map(o => html`
-          <button class="rf-item ${this._sort === o.value ? 'selected' : ''}"
-                  @click=${() => this._rfApply('sort', o.value)}>
-            <input type="radio" .checked=${this._sort === o.value} readonly> ${o.label}
-          </button>`)}
-      </div></div>`;
-    }
-
-    if (name === 'avail') {
-      return html`<div class="${cls}">
-        <div class="rf-drop-scroll">
-          ${AVAILABILITY_OPTIONS.map(o => html`
-            <button class="rf-item ${this._availability === o.value ? 'selected' : ''}"
-                    @click=${() => this._rfApply('availability', o.value)}>
-              <input type="radio" .checked=${this._availability === o.value} readonly>
-              <span class="rf-avail-body">
-                <span>${o.label}</span>
-                <span class="rf-avail-sub">
-                  ${(o.subParts ?? []).map(p => p.href
-                    ? html`<a href=${p.href} target="_blank" rel="noopener"
-                               @click=${e => e.stopPropagation()}>${p.text}</a>`
-                    : p.text)}
-                </span>
-              </span>
-              <span class="rf-count-badge">${o.staticCount}</span>
-            </button>`)}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'lang') {
-      const visible = LANGUAGE_OPTIONS.filter(o =>
-        !this._langSearch || o.label.toLowerCase().includes(this._langSearch.toLowerCase()));
-      return html`<div class="${cls}">
-        <input class="rf-search" placeholder="Search languages…" .value=${this._langSearch}
-               @input=${e => this._langSearch = e.target.value}
-               @click=${e => e.stopPropagation()}>
-        <div class="rf-drop-scroll">
-          ${visible.length === 0 ? html`<div class="rf-empty">No languages found</div>` : ''}
-          ${visible.map(o => {
-            const checked = this._languages.includes(o.value);
-            return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                @click=${() => this._rfApply('languages', toggleArrayValue(this._languages, o.value))}>
-              <input type="checkbox" .checked=${checked} readonly> ${o.label}
-            </button>`;
-          })}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'genre') {
-      const visible = GENRE_OPTIONS.filter(o =>
-        !this._genreSearch || o.label.toLowerCase().includes(this._genreSearch.toLowerCase()));
-      return html`<div class="${cls}">
-        <input class="rf-search" placeholder="Search genres…" .value=${this._genreSearch}
-               @input=${e => this._genreSearch = e.target.value}
-               @click=${e => e.stopPropagation()}>
-        <div class="rf-fiction-section">
-          ${FICTION_OPTIONS.map(o => html`
-            <button class="rf-item ${this._fictionFilter === o.value ? 'selected' : ''}"
-                    @click=${() => this._rfApply('fictionFilter', this._fictionFilter === o.value ? '' : o.value, true)}>
-              <input type="checkbox" .checked=${this._fictionFilter === o.value} readonly>
-              ${o.label}
-            </button>`)}
-        </div>
-        <div class="rf-fiction-sep"></div>
-        <div class="rf-drop-scroll">
-          ${visible.length === 0 ? html`<div class="rf-empty">No genres found</div>` : ''}
-          ${visible.map(o => {
-            const checked = this._genres.includes(o.value);
-            return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                @click=${() => this._rfApply('genres', toggleArrayValue(this._genres, o.value), true)}>
-              <input type="checkbox" .checked=${checked} readonly> ${o.label}
-            </button>`;
-          })}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'author') {
-      const searching = this._authorSearch.trim().length >= 2;
-      const showDefaults = !searching && this._authorResults.length === 0 && !this._facetsLoading;
-      return html`<div class="${cls}">
-        <div class="rf-search-row">
-          <input class="rf-search-inline" placeholder="Search authors…" .value=${this._authorSearch}
-                 @input=${this._onRFAuthorSearch} @click=${e => e.stopPropagation()}>
-          <button class="rf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}><span class="rf-dice-icon">🎲</span></button>
-        </div>
-        <div class="rf-drop-scroll">
-          ${this._facetsLoading ? html`<div class="rf-empty">Loading…</div>` : ''}
-          ${showDefaults ? html`<div class="rf-hint">Suggested authors</div>` : ''}
-          ${showDefaults
-            ? this._defaultAuthors.map(name => {
-                const checked = this._authors.includes(name);
-                return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                    @click=${() => this._rfApply('authors', toggleArrayValue(this._authors, name))}>
-                  <input type="checkbox" .checked=${checked} readonly> ${name}
-                </button>`;
-              })
-            : ''}
-          ${searching && !this._authorResults.length && !this._facetsLoading
-            ? html`<div class="rf-empty">No authors found</div>` : ''}
-          ${!showDefaults && !this._facetsLoading
-            ? this._authorResults.map(a => {
-                const checked = this._authors.includes(a.name);
-                return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                    @click=${() => this._rfApply('authors', toggleArrayValue(this._authors, a.name))}>
-                  <input type="checkbox" .checked=${checked} readonly>
-                  ${a.name}
-                  ${a.work_count ? html`<span class="rf-count-badge">${a.work_count.toLocaleString()}</span>` : ''}
-                </button>`;
-              })
-            : ''}
-        </div>
-      </div>`;
-    }
-
-    if (name === 'subject') {
-      const searching = this._subjectSearch.trim().length >= 2;
-      const showDefaults = !searching && this._subjectResults.length === 0 && !this._facetsLoading;
-      return html`<div class="${cls}">
-        <div class="rf-search-row">
-          <input class="rf-search-inline" placeholder="Search subjects…" .value=${this._subjectSearch}
-                 @input=${this._onRFSubjectSearch} @click=${e => e.stopPropagation()}>
-          <button class="rf-dice" title="Shuffle suggestions"
-                  @click=${e => { e.stopPropagation(); this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}><span class="rf-dice-icon">🎲</span></button>
-        </div>
-        <div class="rf-drop-scroll">
-          ${this._facetsLoading ? html`<div class="rf-empty">Loading…</div>` : ''}
-          ${showDefaults ? html`<div class="rf-hint">Suggested subjects</div>` : ''}
-          ${showDefaults
-            ? this._defaultSubjects.map(name => {
-                const checked = this._subjects.includes(name);
-                return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                    @click=${() => this._rfApply('subjects', toggleArrayValue(this._subjects, name))}>
-                  <input type="checkbox" .checked=${checked} readonly> ${name}
-                </button>`;
-              })
-            : ''}
-          ${searching && !this._subjectResults.length && !this._facetsLoading
-            ? html`<div class="rf-empty">No subjects found</div>` : ''}
-          ${!showDefaults && !this._facetsLoading
-            ? this._subjectResults.map(s => {
-                const checked = this._subjects.includes(s.name);
-                return html`<button class="rf-item ${checked ? 'selected' : ''}"
-                    @click=${() => this._rfApply('subjects', toggleArrayValue(this._subjects, s.name))}>
-                  <input type="checkbox" .checked=${checked} readonly>
-                  ${s.name}
-                  ${s.work_count ? html`<span class="rf-count-badge">${s.work_count.toLocaleString()}</span>` : ''}
-                </button>`;
-              })
-            : ''}
-        </div>
-      </div>`;
-    }
   }
 
   _renderFilterBar() {
