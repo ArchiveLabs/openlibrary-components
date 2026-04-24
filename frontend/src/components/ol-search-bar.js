@@ -82,11 +82,9 @@ export class OlSearchBar extends LitElement {
 
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) {
-        if (this._openFacet !== null) {
-          this._openFacet = null;
-        } else {
-          this._open = false;
-        }
+        this._openFacet = null;
+        this._open = false;
+        this._acFocusIdx = -1;
       }
     };
   }
