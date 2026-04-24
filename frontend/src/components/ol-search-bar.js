@@ -84,6 +84,7 @@ export class OlSearchBar extends LitElement {
       if (!e.composedPath().includes(this)) {
         this._openFacet = null;
         this._open = false;
+        this._acFocusIdx = -1;
       }
     };
   }
