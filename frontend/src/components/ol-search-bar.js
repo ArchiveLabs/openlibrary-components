@@ -538,7 +538,7 @@ export class OlSearchBar extends LitElement {
         <button class="pf-btn ${this._isFacetActive(name) ? 'active' : ''}"
                 aria-expanded=${this._openFacet === name ? 'true' : 'false'}
                 @click=${e => this._toggleFacet(name, e)}>
-          ${name === 'sort' ? html`<span class="pf-sort-icon" aria-hidden="true">⇅</span>` : ''}${this._facetLabel(name)}<span class="pf-caret">▾</span>
+          ${name === 'sort' ? html`<span class="pf-sort-icon" aria-hidden="true">⇅</span>` : ''}${this._facetLabel(name)}<span class="pf-caret" aria-hidden="true">▾</span>
         </button>
         ${this._openFacet === name ? html`
           <ol-facet-drop
