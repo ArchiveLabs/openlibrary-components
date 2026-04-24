@@ -157,6 +157,14 @@ export class OlHeader extends LitElement {
       white-space: nowrap;
     }
     .btn-signup:hover { background: hsl(202, 96%, 28%); }
+
+    @media (max-width: 600px) {
+      :host { overflow: hidden; }
+      nav { display: none; }
+      .btn-signup { display: none; }
+      .search-wrap { margin: 0 4px; min-width: 0; }
+      .bar { gap: 8px; padding: 8px 12px; }
+    }
   `;
 
   render() {
