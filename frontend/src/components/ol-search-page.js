@@ -113,9 +113,11 @@ export class OlSearchPage extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('click', this._onDoc);
-    window.addEventListener('ol-search',        this._globalSearch);
-    window.addEventListener('ol-filter-change', this._globalFilterChange);
-    window.addEventListener('ol-chip-remove',   this._globalChipRemove);
+    // Events from ol-search-bar are bubbles+composed — they reach this host naturally.
+    // Using this (not window) prevents accidental coupling with other page scripts.
+    this.addEventListener('ol-search',        this._globalSearch);
+    this.addEventListener('ol-filter-change', this._globalFilterChange);
+    this.addEventListener('ol-chip-remove',   this._globalChipRemove);
     const q = new URLSearchParams(location.search).get('q');
     if (q) { this._lastQ = q; this._runSearch(1); }
   }
@@ -137,9 +139,9 @@ export class OlSearchPage extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
-    window.removeEventListener('ol-search',        this._globalSearch);
-    window.removeEventListener('ol-filter-change', this._globalFilterChange);
-    window.removeEventListener('ol-chip-remove',   this._globalChipRemove);
+    this.removeEventListener('ol-search',        this._globalSearch);
+    this.removeEventListener('ol-filter-change', this._globalFilterChange);
+    this.removeEventListener('ol-chip-remove',   this._globalChipRemove);
   }
 
   updated(changed) {
