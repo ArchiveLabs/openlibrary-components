@@ -226,6 +226,35 @@ export class OlSearchBar extends LitElement {
     }));
   }
 
+  // ── Clear-all filters ─────────────────────────────────────────
+  _clearAllFilters() {
+    if (this.showFacets) {
+      // Droppable: reset local state and emit a filter-change event for each
+      // field that differs from EMPTY_FILTERS.
+      const f = this._localFilters;
+      const fields = [
+        ['availability',  EMPTY_FILTERS.availability],
+        ['fictionFilter', EMPTY_FILTERS.fictionFilter],
+        ['languages',     EMPTY_FILTERS.languages],
+        ['genres',        EMPTY_FILTERS.genres],
+        ['authors',       EMPTY_FILTERS.authors],
+        ['subjects',      EMPTY_FILTERS.subjects],
+      ];
+      for (const [field, empty] of fields) {
+        const cur = f[field];
+        const isDiff = Array.isArray(cur)
+          ? cur.length > 0
+          : cur !== empty;
+        if (isDiff) this._emitFilter(field, empty, true);
+      }
+      this._openFacet = null;
+    } else {
+      this.dispatchEvent(new CustomEvent('ol-clear-all-filters', {
+        bubbles: true, composed: true,
+      }));
+    }
+  }
+
   // ── Chip handling ─────────────────────────────────────────────
   _handleChipRemove(c) {
     if (this.showFacets) {
@@ -342,7 +371,7 @@ export class OlSearchBar extends LitElement {
       display: flex; flex-wrap: wrap; gap: 4px;
       padding: 8px 14px 6px;
       border-bottom: 1px solid hsl(0,0%,90%);
-      background: hsl(0,0%,99.5%);
+      background: hsl(0,0%,98.5%);
     }
 
     /* Chips */
@@ -363,6 +392,17 @@ export class OlSearchBar extends LitElement {
       padding:0 1px; font-size:15px; line-height:1; opacity:.5;
     }
     .chip-x:hover { opacity:1; }
+
+    /* Clear-all filters button */
+    .clear-all-btn {
+      flex-shrink:0; margin-left:auto; background:none; border:none;
+      cursor:pointer; font-size:11px; font-family:inherit;
+      font-weight:500; color:hsl(0,0%,50%);
+      padding:2px 8px; border-radius:4px;
+      white-space:nowrap; line-height:1.5;
+      transition:color .1s, background .1s;
+    }
+    .clear-all-btn:hover { color:hsl(0,72%,35%); background:hsl(0,72%,96%); }
 
     /* Text input */
     .text-input {
@@ -636,11 +676,23 @@ export class OlSearchBar extends LitElement {
           </div>
         </div>
 
-        ${!this.showFacets && chips.length ? html`<div class="chip-bar">${chipItems}</div>` : ''}
+        ${!this.showFacets && chips.length ? html`
+          <div class="chip-bar">
+            ${chipItems}
+            <button class="clear-all-btn"
+                    aria-label="Clear all filters"
+                    @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>
+          </div>` : ''}
 
         ${this.showFacets && this._open ? html`
           <div class="panel">
-            ${chips.length ? html`<div class="panel-chips">${chipItems}</div>` : ''}
+            ${chips.length ? html`
+              <div class="panel-chips">
+                ${chipItems}
+                <button class="clear-all-btn"
+                        aria-label="Clear all filters"
+                        @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>
+              </div>` : ''}
             ${this._renderFacetBar(!this._loading && !showResults)}
 
             ${this._loading ? html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>` : showResults ? html`

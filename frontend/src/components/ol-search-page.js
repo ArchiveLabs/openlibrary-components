@@ -105,9 +105,10 @@ export class OlSearchPage extends LitElement {
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) this._openFacet = null;
     };
-    this._globalSearch       = e => this._onSearch(e);
-    this._globalFilterChange = e => this._onFilterChange(e);
-    this._globalChipRemove   = e => this._onChipRemove(e);
+    this._globalSearch         = e => this._onSearch(e);
+    this._globalFilterChange   = e => this._onFilterChange(e);
+    this._globalChipRemove     = e => this._onChipRemove(e);
+    this._globalClearAllFilters = () => this._onClearAllFilters();
   }
 
   connectedCallback() {
@@ -115,9 +116,10 @@ export class OlSearchPage extends LitElement {
     document.addEventListener('click', this._onDoc);
     // Events from ol-search-bar are bubbles+composed — they reach this host naturally.
     // Using this (not window) prevents accidental coupling with other page scripts.
-    this.addEventListener('ol-search',        this._globalSearch);
-    this.addEventListener('ol-filter-change', this._globalFilterChange);
-    this.addEventListener('ol-chip-remove',   this._globalChipRemove);
+    this.addEventListener('ol-search',            this._globalSearch);
+    this.addEventListener('ol-filter-change',     this._globalFilterChange);
+    this.addEventListener('ol-chip-remove',       this._globalChipRemove);
+    this.addEventListener('ol-clear-all-filters', this._globalClearAllFilters);
     const q = new URLSearchParams(location.search).get('q');
     if (q) { this._lastQ = q; this._runSearch(1); }
   }
@@ -139,9 +141,10 @@ export class OlSearchPage extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc);
-    this.removeEventListener('ol-search',        this._globalSearch);
-    this.removeEventListener('ol-filter-change', this._globalFilterChange);
-    this.removeEventListener('ol-chip-remove',   this._globalChipRemove);
+    this.removeEventListener('ol-search',            this._globalSearch);
+    this.removeEventListener('ol-filter-change',     this._globalFilterChange);
+    this.removeEventListener('ol-chip-remove',       this._globalChipRemove);
+    this.removeEventListener('ol-clear-all-filters', this._globalClearAllFilters);
   }
 
   updated(changed) {
@@ -281,6 +284,18 @@ export class OlSearchPage extends LitElement {
       case 'author':  this._authors       = this._authors.filter(v => v !== value); break;
       case 'subject': this._subjects      = this._subjects.filter(v => v !== value); break;
     }
+    if (this._lastQ !== null) this._runSearch(1);
+  }
+
+  // ── Clear all filters ─────────────────────────────────────────
+  _onClearAllFilters() {
+    this._sort          = EMPTY_FILTERS.sort;
+    this._availability  = EMPTY_FILTERS.availability;
+    this._fictionFilter = EMPTY_FILTERS.fictionFilter;
+    this._languages     = [...EMPTY_FILTERS.languages];
+    this._genres        = [...EMPTY_FILTERS.genres];
+    this._authors       = [...EMPTY_FILTERS.authors];
+    this._subjects      = [...EMPTY_FILTERS.subjects];
     if (this._lastQ !== null) this._runSearch(1);
   }
 
