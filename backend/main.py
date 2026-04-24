@@ -80,7 +80,7 @@ async def search(
     # We add an explicit OR to q_parts so both tiers appear in results, and keep the
     # ebook_access param (set to borrowable) to trigger block-join inner-hits.
     if availability == "readable":
-        q_parts.append('(ebook_access:borrowable OR ebook_access:public)')
+        q_parts.append('(ebook_access:[borrowable TO public])')
         params["q"] = " ".join(q_parts)  # refresh after appending ebook_access filter
         params["ebook_access"] = "borrowable"  # trigger block-join inner-hits
     elif availability == "open":
