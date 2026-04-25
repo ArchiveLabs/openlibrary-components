@@ -96,12 +96,12 @@ export class OlSearchBar extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('click', this._onDoc);
+    document.addEventListener('click', this._onDoc, true);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('click', this._onDoc);
+    document.removeEventListener('click', this._onDoc, true);
     this._acAbort?.abort();
     this._authorAbort?.abort();
     this._subjectAbort?.abort();

@@ -1,14 +1,5 @@
 import { test, expect } from '@playwright/test';
 
-// Helper: pierce shadow DOM to click or read elements
-async function shadowClick(page, hostSelector, shadowSelector) {
-  return page.evaluate(({ host, sel }) => {
-    const el = document.querySelector(host)?.shadowRoot?.querySelector(sel);
-    if (!el) throw new Error(`Shadow element not found: ${host} >> ${sel}`);
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
-  }, { host: hostSelector, sel: shadowSelector });
-}
-
 async function waitForCustomElements(page) {
   await page.waitForFunction(() =>
     customElements.get('ol-search-bar') !== undefined &&
@@ -16,9 +7,36 @@ async function waitForCustomElements(page) {
   );
 }
 
-// ── Issue #21: clicking panel chips while facet is open should dismiss it ──
+async function openPanelAndFacet(page) {
+  // Open the search panel
+  await page.evaluate(() => {
+    const sb = document.querySelector('ol-search-bar');
+    sb?.shadowRoot?.querySelector('input')?.focus();
+    sb?.shadowRoot?.querySelector('input')?.click();
+  });
+  await page.waitForFunction(() => {
+    const sb = document.querySelector('ol-search-bar');
+    return sb?.shadowRoot?.querySelector('.panel') !== null;
+  });
 
-test.describe('facet dropdown dismissal', () => {
+  // Open the first facet dropdown
+  await page.evaluate(() => {
+    const sb = document.querySelector('ol-search-bar');
+    sb?.shadowRoot?.querySelector('.pf-btn')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true })
+    );
+  });
+
+  // Wait for ol-facet-drop to appear
+  await page.waitForFunction(() => {
+    const sb = document.querySelector('ol-search-bar');
+    return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
+  }, { timeout: 3000 });
+}
+
+// ── Issue #21: clicking panel chips / background while facet is open should dismiss it ──
+
+test.describe('facet dropdown dismissal (issue #21)', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/');
@@ -26,145 +44,94 @@ test.describe('facet dropdown dismissal', () => {
     await page.locator('ol-search-bar').waitFor({ state: 'attached' });
   });
 
-  test('clicking the panel background closes an open facet dropdown', async ({ page }) => {
-    // Open the panel by clicking the search input
+  test('clicking .panel-chips closes an open facet dropdown', async ({ page }) => {
+    await openPanelAndFacet(page);
+
+    // Confirm facet-drop is open
+    const openBefore = await page.evaluate(() =>
+      document.querySelector('ol-search-bar')?.shadowRoot?.querySelector('ol-facet-drop') !== null
+    );
+    expect(openBefore).toBe(true);
+
+    // Click panel-chips — inside ol-search-bar but outside ol-facet-drop
     await page.evaluate(() => {
       const sb = document.querySelector('ol-search-bar');
-      sb?.shadowRoot?.querySelector('input')?.focus();
-      sb?.shadowRoot?.querySelector('input')?.click();
-    });
-
-    // Wait for the panel to appear
-    await page.waitForFunction(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('.panel') !== null;
-    });
-
-    // Click the first facet button to open its dropdown
-    await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      const btn = sb?.shadowRoot?.querySelector('.pf-btn');
-      btn?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
-    });
-
-    // Wait for ol-facet-drop to appear
-    await page.waitForFunction(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
-    }, { timeout: 3000 });
-
-    // Facet dropdown is visible
-    const facetOpenBefore = await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
-    });
-    expect(facetOpenBefore).toBe(true);
-
-    // Click on .panel-chips (inside panel but outside ol-facet-drop)
-    await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      const chips = sb?.shadowRoot?.querySelector('.panel-chips');
-      chips?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
-    });
-
-    // Facet dropdown should now be gone
-    await page.waitForFunction(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('ol-facet-drop') === null;
-    }, { timeout: 2000 });
-
-    const facetGone = await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('ol-facet-drop') === null;
-    });
-    expect(facetGone).toBe(true);
-  });
-
-  test('clicking inside ol-facet-drop keeps it open', async ({ page }) => {
-    // Open panel
-    await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      sb?.shadowRoot?.querySelector('input')?.focus();
-      sb?.shadowRoot?.querySelector('input')?.click();
-    });
-    await page.waitForFunction(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('.panel') !== null;
-    });
-
-    // Open first facet
-    await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      sb?.shadowRoot?.querySelector('.pf-btn')?.dispatchEvent(
+      sb?.shadowRoot?.querySelector('.panel-chips')?.dispatchEvent(
         new MouseEvent('click', { bubbles: true, composed: true })
       );
     });
-    await page.waitForFunction(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
-    }, { timeout: 3000 });
 
-    // Click inside the facet-drop itself (e.g. first .item)
+    // Facet-drop should be removed from the DOM
+    await page.waitForFunction(() =>
+      document.querySelector('ol-search-bar')?.shadowRoot?.querySelector('ol-facet-drop') === null,
+      { timeout: 2000 }
+    );
+
+    const gone = await page.evaluate(() =>
+      document.querySelector('ol-search-bar')?.shadowRoot?.querySelector('ol-facet-drop') === null
+    );
+    expect(gone).toBe(true);
+  });
+
+  test('clicking inside ol-facet-drop keeps it open', async ({ page }) => {
+    await openPanelAndFacet(page);
+
+    // Click the ol-facet-drop host itself — no interactive child triggered,
+    // but composed path includes OL-FACET-DROP so _onDoc guard preserves it
     await page.evaluate(() => {
       const sb = document.querySelector('ol-search-bar');
       const drop = sb?.shadowRoot?.querySelector('ol-facet-drop');
-      const item = drop?.shadowRoot?.querySelector('.item');
-      item?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      drop?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     });
 
-    // Wait a tick — facet-drop should remain (sort items close on selection; use panel existence instead)
+    // Brief settle
     await page.waitForTimeout(200);
 
-    // Panel should still be open (not everything collapsed)
-    const panelStillOpen = await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      return sb?.shadowRoot?.querySelector('.panel') !== null;
-    });
-    expect(panelStillOpen).toBe(true);
+    // ol-facet-drop must still be present
+    const stillOpen = await page.evaluate(() =>
+      document.querySelector('ol-search-bar')?.shadowRoot?.querySelector('ol-facet-drop') !== null
+    );
+    expect(stillOpen).toBe(true);
   });
 });
 
 // ── Issue #22: clicking the submit button fires ol-search event ──
 
-test.describe('submit button', () => {
+test.describe('submit button (issue #22)', () => {
   test('clicking the magnifying glass dispatches an ol-search event', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/');
     await waitForCustomElements(page);
     await page.locator('ol-search-bar').waitFor({ state: 'attached' });
 
-    // Listen for ol-search event
+    // Arm the listener before interacting
     await page.evaluate(() => {
       window.__olSearchFired = false;
       document.addEventListener('ol-search', () => { window.__olSearchFired = true; }, { once: true });
     });
 
-    // Type a query into the search input
+    // Focus input and set query value
     await page.evaluate(() => {
       const sb = document.querySelector('ol-search-bar');
       const input = sb?.shadowRoot?.querySelector('input');
-      if (!input) throw new Error('No search input found');
-      input.focus();
-      input.click();
-    });
-    // Set the value and trigger input event so the component's _q state updates
-    await page.evaluate(() => {
-      const sb = document.querySelector('ol-search-bar');
-      const input = sb?.shadowRoot?.querySelector('input');
-      input.value = 'frankenstein';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input?.focus();
+      input?.click();
+      if (input) {
+        input.value = 'frankenstein';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
     });
 
     // Click the submit button
     await page.evaluate(() => {
       const sb = document.querySelector('ol-search-bar');
-      const btn = sb?.shadowRoot?.querySelector('.submit');
-      if (!btn) throw new Error('No submit button found');
-      btn.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      sb?.shadowRoot?.querySelector('.submit')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, composed: true })
+      );
     });
 
-    // Wait a tick for the event to fire
-    await page.waitForTimeout(200);
+    // Wait deterministically for the event rather than a fixed timeout
+    await page.waitForFunction(() => window.__olSearchFired === true, { timeout: 2000 });
 
     const fired = await page.evaluate(() => window.__olSearchFired);
     expect(fired).toBe(true);
