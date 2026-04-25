@@ -188,6 +188,12 @@ export class OlFacetDrop extends LitElement {
       font-weight: 500; transition: background .1s;
     }
     .clear:hover { background: hsl(0,72%,95%); }
+
+    @media (max-width: 600px) {
+      :host { max-width: calc(100vw - 8px); left: 0; right: auto; }
+      :host([right]) { left: auto; right: 0; }
+      .item { padding: 11px 14px; }
+    }
   `;
 
   // ── Lifecycle ─────────────────────────────────────────────────
