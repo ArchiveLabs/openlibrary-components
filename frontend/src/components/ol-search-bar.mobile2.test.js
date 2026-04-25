@@ -25,14 +25,6 @@ describe('ol-search-bar mobile Phase 2 CSS contract', () => {
     expect(mediaIdx).not.toBe(-1);
   });
 
-  it('.panel has max-height: 80vh to prevent full-screen overlay with virtual keyboard open', () => {
-    expect(mobileBlock).toMatch(/\.panel[^{]*\{[^}]*max-height\s*:\s*80vh/);
-  });
-
-  it('.panel has overflow-y: auto for inner scrolling', () => {
-    expect(mobileBlock).toMatch(/\.panel[^{]*\{[^}]*overflow-y\s*:\s*auto/);
-  });
-
   it('.ac-scroll max-height uses vh (not px) so it respects virtual keyboard', () => {
     const match = mobileBlock.match(/\.ac-scroll[^{]*\{[^}]*max-height\s*:\s*(\S+)/);
     expect(match).not.toBeNull();
