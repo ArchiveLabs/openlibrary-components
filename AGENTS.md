@@ -126,6 +126,12 @@ The PR body should state which test proves the fix, or link the screenshot inlin
 
 After opening a PR, **schedule a reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot typically posts its review within a few minutes of the PR being created; 8 minutes gives it enough time to finish without waiting too long.
 
+`ScheduleWakeup` fires in the **same session** that opened the PR, so the prompt can be short — all project context, AGENTS.md rules, and the reply+resolve workflow are already in conversation history. The prompt only needs to identify the PR number and the action:
+
+```
+Check PR #<N> on ArchiveLabs/openlibrary-components for Copilot review feedback and address any comments per AGENTS.md.
+```
+
 When the reminder fires:
 1. Fetch inline comments: `gh api repos/ArchiveLabs/openlibrary-components/pulls/<PR>/comments --jq '.[] | {id, node_id, line, path, body}'`
 2. Fetch the overview review: `gh pr view <PR> --repo ArchiveLabs/openlibrary-components --json reviews`
