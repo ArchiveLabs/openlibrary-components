@@ -534,12 +534,13 @@ export class OlSearchBar extends LitElement {
     .ac-see-all:hover { background:hsl(202,96%,28%); }
 
     @media (max-width: 600px) {
-      .panel { left: -4px; right: -4px; }
+      .panel { left: -4px; right: -4px; max-height: 80vh; overflow-y: auto; }
       .pf-bar { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
       .pf-bar::-webkit-scrollbar { display: none; }
-      .pf-btn { font-size: 10px; padding: 7px 3px; }
+      .pf-btn { font-size: 10px; padding: 11px 4px; }
       .submit { padding: 6px 10px; }
-      .ac-scroll { max-height: 220px; }
+      .ac-scroll { max-height: 40vh; }
+      .panel-chips { max-height: 72px; overflow-y: auto; }
     }
   `;
 
