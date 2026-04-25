@@ -108,6 +108,22 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `style`
 
 Squash fixup commits; keep history as logical milestones.
 
+## Pull Request Standards
+
+### Bug fixes must include evidence
+
+Every PR that fixes a bug or addresses a regression **must** include at least one of:
+
+1. **A new test** (Vitest or Playwright) that was failing before the fix and passes after. Name it so it's obvious which bug it covers. Prefer a Playwright test for interactive/click bugs since they verify the actual browser behavior; prefer a Vitest CSS-content test for layout/style regressions.
+
+2. **A screenshot** attached to the PR description showing the fixed state (acceptable when writing a deterministic test isn't practical, e.g. a pure visual regression). Playwright's `page.screenshot()` is the preferred way to generate these.
+
+The PR body should state which test proves the fix, or link the screenshot inline. Copilot and reviewers will check for this.
+
+**Anti-pattern to avoid:** opening a bug-fix PR that only modifies source code with no test or screenshot. A fix with no proof is unverifiable and may silently regress.
+
+---
+
 ## Known Constraints and Gotchas
 
 - **Shadow DOM z-index**: dropdowns inside shadow roots can be clipped by overflow. Keep dropdowns inside the same shadow root as their triggers (`z-index` works across shadow boundaries only when there's no stacking context ancestor).
