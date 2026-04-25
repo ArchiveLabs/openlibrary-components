@@ -122,6 +122,17 @@ The PR body should state which test proves the fix, or link the screenshot inlin
 
 **Anti-pattern to avoid:** opening a bug-fix PR that only modifies source code with no test or screenshot. A fix with no proof is unverifiable and may silently regress.
 
+### Wait for Copilot review after opening a PR
+
+After opening a PR, **schedule a reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot typically posts its review within a few minutes of the PR being created; 8 minutes gives it enough time to finish without waiting too long.
+
+When the reminder fires:
+1. Fetch inline comments: `gh api repos/ArchiveLabs/openlibrary-components/pulls/<PR>/comments --jq '.[] | {id, node_id, line, path, body}'`
+2. Fetch the overview review: `gh pr view <PR> --repo ArchiveLabs/openlibrary-components --json reviews`
+3. Address every comment, push a fix commit, then reply and resolve each thread (see rule below).
+
+If there are no comments yet when the reminder fires, wait another few minutes before concluding there is no feedback.
+
 ### Responding to review comments (Copilot or human)
 
 After addressing review feedback and pushing the updated branch, **reply to each comment thread** you addressed and **resolve it**:
