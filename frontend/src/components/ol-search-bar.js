@@ -742,7 +742,7 @@ export class OlSearchBar extends LitElement {
             ${this._mobileExpanded ? html`
               <div class="mob-back-bar">
                 <button class="mob-back-btn" aria-label="Close search"
-                        @click=${e => { e.stopPropagation(); this._mobileExpanded = false; this._open = false; this._openFacet = null; }}>
+                        @click=${e => { e.stopPropagation(); this._mobileExpanded = false; this._open = false; this._openFacet = null; this._acFocusIdx = -1; }}>
                   ← Back
                 </button>
               </div>` : nothing}
