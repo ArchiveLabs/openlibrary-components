@@ -43,8 +43,9 @@ export class OlSearchBar extends LitElement {
     _subjectResults:  { state: true },
     _defaultAuthors:  { state: true },
     _defaultSubjects: { state: true },
-    _facetsLoading:   { state: true },
-    _acFocusIdx:      { state: true },  // keyboard-focused autocomplete result index
+    _facetsLoading:    { state: true },
+    _acFocusIdx:       { state: true },  // keyboard-focused autocomplete result index
+    _mobileExpanded:   { state: true },  // full-screen overlay active on narrow viewport
   };
 
   constructor() {
@@ -73,6 +74,7 @@ export class OlSearchBar extends LitElement {
     this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6);
     this._facetsLoading   = false;
     this._acFocusIdx      = -1;
+    this._mobileExpanded  = false;
     this._authorTimer     = null;
     this._subjectTimer    = null;
     this._acAbort         = null;   // AbortController for in-flight autocomplete fetch
@@ -86,6 +88,7 @@ export class OlSearchBar extends LitElement {
         this._openFacet = null;
         this._open = false;
         this._acFocusIdx = -1;
+        this._mobileExpanded = false;
       } else if (this._openFacet !== null) {
         const inFacetDrop = path.some(el => el?.tagName === 'OL-FACET-DROP');
         const inFacetBtn  = path.some(el => el?.classList?.contains?.('pf-btn'));
@@ -123,6 +126,8 @@ export class OlSearchBar extends LitElement {
     if (changed.has('_openFacet') && changed.get('_openFacet') !== null && this._openFacet === null) {
       this._lastFacetBtn?.focus();
     }
+    // Sync full-screen overlay class on the host element.
+    this.classList.toggle('mobile-exp', this._mobileExpanded);
   }
 
   // ── Filter helpers ────────────────────────────────────────────
@@ -137,8 +142,12 @@ export class OlSearchBar extends LitElement {
 
   // ── Autocomplete ──────────────────────────────────────────────
   _onFocus() {
-    // Only open the panel in droppable mode.
-    if (this.showFacets) this._open = true;
+    if (this.showFacets) {
+      this._open = true;
+      if (window.matchMedia('(max-width: 600px)').matches) {
+        this._mobileExpanded = true;
+      }
+    }
     this._openFacet = null;
   }
 
@@ -198,7 +207,8 @@ export class OlSearchBar extends LitElement {
 
   _onKeyDown(e) {
     if (e.key === 'Escape') {
-      this._open = false; this._openFacet = null; this._acFocusIdx = -1; return;
+      this._open = false; this._openFacet = null; this._acFocusIdx = -1;
+      this._mobileExpanded = false; return;
     }
     // Arrow navigation through autocomplete results.
     if (this._open && this._suggestions.length > 0) {
@@ -223,6 +233,7 @@ export class OlSearchBar extends LitElement {
 
   _submit() {
     if (!this._q.trim() && !this._hasActiveFilters()) return;
+    this._mobileExpanded = false;
     this.dispatchEvent(new CustomEvent('ol-search', {
       detail: { q: this._q.trim(), filters: this._localFilters },
       bubbles: true, composed: true,
@@ -546,6 +557,43 @@ export class OlSearchBar extends LitElement {
       .submit { padding: 6px 10px; }
       .ac-scroll { max-height: 40vh; }
       .panel-chips { max-height: 72px; overflow-y: auto; }
+
+      /* ── Full-screen overlay (mobile-exp class toggled via JS) ── */
+      :host(.mobile-exp) {
+        position: fixed; inset: 0; z-index: 9000;
+        width: 100dvw; height: 100dvh;
+        display: flex; flex-direction: column;
+        background: white; overflow: hidden;
+      }
+      :host(.mobile-exp) .search-outer {
+        flex-shrink: 0; padding: 10px 12px;
+        border-bottom: 1.5px solid hsl(202,96%,37%);
+      }
+      :host(.mobile-exp) .search-outer.open .input-row {
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+      }
+      :host(.mobile-exp) .panel {
+        position: static; flex: 1;
+        overflow-y: auto; max-height: none;
+        border: none; box-shadow: none; border-radius: 0;
+        border-top: none;
+      }
+      :host(.mobile-exp) .panel-chips { max-height: none; }
+      :host(.mobile-exp) .ac-scroll { max-height: none; }
+
+      /* Back button shown at top of the expanded panel */
+      .mob-back-bar {
+        padding: 8px 12px 4px;
+        border-bottom: 1px solid hsl(0,0%,92%);
+        background: hsl(0,0%,98.5%);
+      }
+      .mob-back-btn {
+        background: none; border: none; cursor: pointer;
+        font-size: 14px; font-family: inherit; color: hsl(202,96%,37%);
+        padding: 4px 0; font-weight: 500;
+      }
+      .mob-back-btn:hover { color: hsl(202,96%,28%); }
     }
   `;
 
@@ -691,6 +739,13 @@ export class OlSearchBar extends LitElement {
 
         ${this.showFacets && this._open ? html`
           <div class="panel">
+            ${this._mobileExpanded ? html`
+              <div class="mob-back-bar">
+                <button class="mob-back-btn" aria-label="Close search"
+                        @click=${e => { e.stopPropagation(); this._mobileExpanded = false; this._open = false; this._openFacet = null; this._acFocusIdx = -1; }}>
+                  ← Back
+                </button>
+              </div>` : nothing}
             ${chips.length ? html`
               <div class="panel-chips">
                 ${chipItems}
