@@ -122,6 +122,33 @@ The PR body should state which test proves the fix, or link the screenshot inlin
 
 **Anti-pattern to avoid:** opening a bug-fix PR that only modifies source code with no test or screenshot. A fix with no proof is unverifiable and may silently regress.
 
+### Responding to review comments (Copilot or human)
+
+After addressing review feedback and pushing the updated branch, **reply to each comment thread** you addressed and **resolve it**:
+
+1. **Reply** with a short note explaining what you changed — one sentence is enough, e.g. *"Switched to capture phase; updated in commit abc1234."* Use `gh api` to post the reply:
+   ```bash
+   gh api repos/ArchiveLabs/openlibrary-components/pulls/<PR>/comments/<comment_id>/replies \
+     -f body="<your reply>"
+   ```
+2. **Resolve** the thread so it collapses in the GitHub UI and the reviewer knows it's been handled:
+   ```bash
+   gh api repos/ArchiveLabs/openlibrary-components/pulls/<PR>/reviews \
+     -f body="" -f event="COMMENT" \
+     --jq '.id'  # not needed for resolving — use GraphQL below
+   # Resolve via GraphQL (threads are resolved through the GraphQL API):
+   gh api graphql -f query='
+     mutation { resolveReviewThread(input: { threadId: "<thread_node_id>" }) {
+       thread { isResolved }
+     }
+   }'
+   ```
+   To get thread node IDs: `gh api repos/ArchiveLabs/openlibrary-components/pulls/<PR>/comments --jq '.[] | {id, node_id, body: .body[:60]}'`
+
+3. **Do not leave any thread unresolved or unanswered.** After pushing, loop through every open comment, reply, and resolve. This is how the reviewer (Mek) knows at a glance that nothing is outstanding.
+
+**Anti-pattern to avoid:** pushing a fix commit without replying to the comment threads — the reviewer must re-read every thread to figure out what was addressed vs. ignored.
+
 ---
 
 ## Known Constraints and Gotchas
