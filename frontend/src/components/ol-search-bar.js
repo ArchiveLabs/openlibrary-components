@@ -81,10 +81,15 @@ export class OlSearchBar extends LitElement {
     this._lastFacetBtn    = null;   // button that opened the current facet dropdown (for focus return)
 
     this._onDoc = e => {
-      if (!e.composedPath().includes(this)) {
+      const path = e.composedPath();
+      if (!path.includes(this)) {
         this._openFacet = null;
         this._open = false;
         this._acFocusIdx = -1;
+      } else if (this._openFacet !== null) {
+        const inFacetDrop = path.some(el => el?.tagName === 'OL-FACET-DROP');
+        const inFacetBtn  = path.some(el => el?.classList?.contains?.('pf-btn'));
+        if (!inFacetDrop && !inFacetBtn) this._openFacet = null;
       }
     };
   }
@@ -659,7 +664,7 @@ export class OlSearchBar extends LitElement {
                       @click=${e => { e.stopPropagation(); this._clearInput(); }}>✕</button>
             ` : ''}
 
-            <button class="submit" @click=${this._submit} aria-label="Search">
+            <button class="submit" @click=${() => this._submit()} aria-label="Search">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
               </svg>
