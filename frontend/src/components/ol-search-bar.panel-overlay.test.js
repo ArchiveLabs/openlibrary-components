@@ -3,21 +3,6 @@ import { describe, it, expect } from 'vitest';
 
 const src = readFileSync(new URL('./ol-search-bar.js', import.meta.url), 'utf8');
 
-// ── CSS helpers ───────────────────────────────────────────────────────────────
-
-function extractBlock(source, startToken) {
-  const idx = source.indexOf(startToken);
-  if (idx === -1) return '';
-  let depth = 0;
-  for (let i = idx; i < source.length; i++) {
-    if (source[i] === '{') depth++;
-    else if (source[i] === '}') { depth--; if (depth === 0) return source.slice(idx, i + 1); }
-  }
-  return '';
-}
-
-// :host(.mobile-exp) rules are now standalone — search full src, not a media block.
-const mobileBlock  = extractBlock(src, '@media (max-width: 600px)');
 const panelCssIdx  = src.indexOf('.panel {');
 const panelCssEnd  = src.indexOf('}', panelCssIdx);
 const panelCss     = panelCssIdx !== -1 ? src.slice(panelCssIdx, panelCssEnd + 1) : '';

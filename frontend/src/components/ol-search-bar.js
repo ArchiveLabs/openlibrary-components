@@ -782,7 +782,7 @@ export class OlSearchBar extends LitElement {
                    href="${this.siteBase}${linkKey}"
                    target="_blank" rel="noopener"
                    role="option"
-                   @click=${() => this._open = false}>
+                   @click=${() => { this._open = false; this._mobileExpanded = false; }}>
                   ${cover
                     ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
                     : html`<div class="ac-blank">📖</div>`}
@@ -806,7 +806,7 @@ export class OlSearchBar extends LitElement {
            target="_blank" rel="noopener"
            @click=${e => e.stopPropagation()}>+ Add Book</a>
         <button class="ac-see-all" @click=${() => {
-          this._open = false;
+          this._open = false; this._mobileExpanded = false;
           if (!q && !this._hasActiveFilters()) return;
           this.dispatchEvent(new CustomEvent('ol-search', {
             detail: { q, filters: this._localFilters }, bubbles: true, composed: true,
@@ -861,7 +861,6 @@ export class OlSearchBar extends LitElement {
     }
 
     // ── Droppable (header) mode: trigger button + fixed panel overlay ──
-    const showResults = q.length >= 2 || this._hasActiveFilters();
     return html`
       <div class="search-outer ${this._open ? 'open' : ''}" role="search">
 
@@ -870,7 +869,8 @@ export class OlSearchBar extends LitElement {
           <button class="trigger-btn"
                   @click=${this._onTriggerClick}
                   aria-expanded=${this._open ? 'true' : 'false'}
-                  aria-haspopup="dialog"
+                  aria-haspopup="true"
+                  aria-controls="search-panel"
                   aria-label="${this.placeholder}">
             <span class="${!this._q ? 'trigger-placeholder' : ''}">${this._q || this.placeholder}</span>
           </button>
@@ -891,7 +891,7 @@ export class OlSearchBar extends LitElement {
 
         <!-- Panel overlay (position:fixed via CSS vars set by _positionPanel) -->
         ${this._open ? html`
-          <div class="panel">
+          <div class="panel" id="search-panel" role="dialog" aria-modal=${this._mobileExpanded ? 'true' : 'false'} aria-label="${this.placeholder}">
             ${this._mobileExpanded ? html`
               <div class="mob-back-bar">
                 <button class="mob-back-btn" aria-label="Close search"

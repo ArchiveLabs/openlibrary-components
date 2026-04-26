@@ -69,8 +69,9 @@ describe('ol-search-bar mobile overlay JS contract', () => {
     expect(src).toMatch(/this\._mobileExpanded\s*=\s*false/);
   });
 
-  it('sets _mobileExpanded = true in _onFocus when on mobile', () => {
-    expect(src).toMatch(/_mobileExpanded\s*=\s*true/);
+  it('sets _mobileExpanded = true in _onTriggerClick on narrow viewports', () => {
+    const fn = src.slice(src.indexOf('_onTriggerClick'), src.indexOf('_onTriggerClick') + 300);
+    expect(fn).toMatch(/_mobileExpanded\s*=\s*true/);
   });
 
   it('clears _mobileExpanded in _onKeyDown Escape path', () => {

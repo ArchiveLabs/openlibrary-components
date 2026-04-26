@@ -24,6 +24,8 @@ export default [
         localStorage: 'readonly',
         AbortController: 'readonly',
         Promise: 'readonly',
+        requestAnimationFrame: 'readonly',
+        DOMException: 'readonly',
       },
     },
     rules: {
