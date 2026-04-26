@@ -164,12 +164,12 @@ describe('ol-search-bar autocomplete error state', () => {
   });
 
   it('sets _acError = true on non-abort fetch failure', () => {
-    const fetchFn = src.slice(src.indexOf('_fetchAutocomplete'), src.indexOf('_fetchAutocomplete') + 1500);
+    const fetchFn = src.slice(src.indexOf('async _fetchAutocomplete()'), src.indexOf('async _fetchAutocomplete()') + 1500);
     expect(fetchFn).toMatch(/_acError\s*=\s*true/);
   });
 
   it('resets _acError = false at the start of each fetch', () => {
-    const fetchFn = src.slice(src.indexOf('_fetchAutocomplete'), src.indexOf('_fetchAutocomplete') + 1500);
+    const fetchFn = src.slice(src.indexOf('async _fetchAutocomplete()'), src.indexOf('async _fetchAutocomplete()') + 1500);
     expect(fetchFn).toMatch(/_acError\s*=\s*false/);
   });
 
@@ -181,5 +181,15 @@ describe('ol-search-bar autocomplete error state', () => {
 
   it('.ac-error CSS rule exists in component styles', () => {
     expect(src).toMatch(/\.ac-error\s*\{/);
+  });
+
+  it('_onInput early-return path clears _acError so stale error does not persist', () => {
+    const fn = src.slice(src.indexOf('_onInput(e)'), src.indexOf('_onInput(e)') + 400);
+    expect(fn).toMatch(/_acError\s*=\s*false/);
+  });
+
+  it('_clearInput clears _acError so stale error does not persist', () => {
+    const fn = src.slice(src.indexOf('_clearInput()'), src.indexOf('_clearInput()') + 300);
+    expect(fn).toMatch(/_acError\s*=\s*false/);
   });
 });

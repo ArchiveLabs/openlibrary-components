@@ -208,7 +208,8 @@ export class OlSearchBar extends LitElement {
     clearTimeout(this._timer);
     if (this._q.trim().length < 2 && !this._hasActiveFilters()) {
       this._suggestions = [];
-      this._loading = false;
+      this._acError     = false;
+      this._loading     = false;
       return;
     }
     this._loading = true;
@@ -252,6 +253,7 @@ export class OlSearchBar extends LitElement {
     clearTimeout(this._timer);
     this._q           = '';
     this._suggestions = [];
+    this._acError     = false;
     this._total       = 0;
     this._acFocusIdx  = -1;
     this._loading     = false;
