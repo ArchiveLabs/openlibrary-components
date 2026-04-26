@@ -120,7 +120,9 @@ export const POPULAR_AUTHORS = [
   'Chimamanda Ngozi Adichie', 'Kazuo Ishiguro', 'Salman Rushdie', 'Milan Kundera',
 ];
 
-export const EMPTY_FILTERS = {
+// DEFAULT_FILTERS is the canonical name — "EMPTY" was a misnomer because
+// availability defaults to 'readable', not to a truly empty state.
+export const DEFAULT_FILTERS = {
   sort:          '',
   availability:  'readable',
   fictionFilter: '',
@@ -129,6 +131,9 @@ export const EMPTY_FILTERS = {
   authors:       [],
   subjects:      [],
 };
+
+// Backward-compat alias so existing import sites don't need to change at once.
+export const EMPTY_FILTERS = DEFAULT_FILTERS;
 
 // ── Label helpers ─────────────────────────────────────────────────────────────
 

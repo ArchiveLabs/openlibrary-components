@@ -4,6 +4,8 @@ import {
   EMPTY_FILTERS, shufflePick, bestEdition,
   getSortLabel, buildChips,
 } from '../utils/filters.js';
+import { BREAKPOINTS } from '../utils/breakpoints.js';
+import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
 import './ol-howto-modal.js';
 import './ol-facet-drop.js';
 
@@ -82,6 +84,19 @@ export class OlSearchBar extends LitElement {
     this._subjectAbort    = null;   // AbortController for subject search
     this._lastFacetBtn    = null;   // button that opened the current facet dropdown (for focus return)
 
+    this._onWinResize = () => {
+      if (!this._open) return;
+      const isMobile = window.matchMedia(`(max-width: ${BREAKPOINTS.mobile}px)`).matches;
+      if (isMobile && !this._mobileExpanded) {
+        this._mobileExpanded = true;           // shrunk into mobile — switch to full-screen overlay
+      } else if (!isMobile && this._mobileExpanded) {
+        this._mobileExpanded = false;          // grown out of mobile — switch to positioned panel
+        requestAnimationFrame(() => this._positionPanel());
+      } else if (!isMobile) {
+        requestAnimationFrame(() => this._positionPanel()); // desktop resize — reposition
+      }
+    };
+
     this._onDoc = e => {
       const path = e.composedPath();
       if (!path.includes(this)) {
@@ -100,11 +115,13 @@ export class OlSearchBar extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('click', this._onDoc, true);
+    window.addEventListener('resize', this._onWinResize);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc, true);
+    window.removeEventListener('resize', this._onWinResize);
     this._acAbort?.abort();
     this._authorAbort?.abort();
     this._subjectAbort?.abort();
@@ -128,6 +145,37 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
+    // Anchor the panel to the trigger and focus the panel-input when it opens.
+    if (changed.has('_open') && this._open && this.showFacets) {
+      if (!this._mobileExpanded) this._positionPanel();
+      requestAnimationFrame(() => this.shadowRoot?.querySelector('.panel-input')?.focus());
+    }
+  }
+
+  // Set CSS custom properties on :host so the panel's position:fixed CSS vars resolve
+  // to the correct viewport-anchored coordinates.
+  // ≥900px: right-aligned with trigger, min 600px wide.
+  // 600–900px: horizontally centered, 85% viewport width.
+  _positionPanel() {
+    if (this._mobileExpanded) return;
+    const trigger = this.shadowRoot?.querySelector('.input-row');
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const vw   = window.innerWidth;
+    this.style.setProperty('--ol-panel-top', `${rect.top}px`);
+    if (vw > BREAKPOINTS.wide) {
+      const desired = Math.max(600, Math.min(860, rect.width));
+      const panelW  = Math.min(desired, rect.right - 8);
+      this.style.setProperty('--ol-panel-width', `${panelW}px`);
+      this.style.setProperty('--ol-panel-right', `${Math.max(0, vw - rect.right)}px`);
+      this.style.setProperty('--ol-panel-left',  'auto');
+    } else {
+      const panelW = Math.max(600, Math.round(vw * 0.85));
+      const left   = Math.round((vw - panelW) / 2);
+      this.style.setProperty('--ol-panel-width', `${panelW}px`);
+      this.style.setProperty('--ol-panel-left',  `${left}px`);
+      this.style.setProperty('--ol-panel-right', 'auto');
+    }
   }
 
   // ── Filter helpers ────────────────────────────────────────────
@@ -141,12 +189,13 @@ export class OlSearchBar extends LitElement {
   }
 
   // ── Autocomplete ──────────────────────────────────────────────
-  _onFocus() {
-    if (this.showFacets) {
-      this._open = true;
-      if (window.matchMedia('(max-width: 600px)').matches) {
-        this._mobileExpanded = true;
-      }
+
+  // Opens the panel overlay (droppable mode trigger click).
+  _onTriggerClick(e) {
+    e.stopPropagation();
+    this._open = true;
+    if (window.matchMedia(`(max-width: ${BREAKPOINTS.mobile}px)`).matches) {
+      this._mobileExpanded = true;
     }
     this._openFacet = null;
   }
@@ -322,10 +371,9 @@ export class OlSearchBar extends LitElement {
     const { signal } = this._authorAbort;
     this._authorTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
-        this._authorResults = d.docs ?? [];
-      } catch (err) {
-        if (err.name !== 'AbortError') this._authorResults = [];
+        this._authorResults = await fetchAuthorSuggestions(q, { signal, apiBase: this.apiBase });
+      } catch {
+        this._authorResults = [];
       } finally {
         if (!signal.aborted) this._facetsLoading = false;
       }
@@ -342,10 +390,9 @@ export class OlSearchBar extends LitElement {
     const { signal } = this._subjectAbort;
     this._subjectTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
-        this._subjectResults = d.docs ?? [];
-      } catch (err) {
-        if (err.name !== 'AbortError') this._subjectResults = [];
+        this._subjectResults = await fetchSubjectSuggestions(q, { signal, apiBase: this.apiBase });
+      } catch {
+        this._subjectResults = [];
       } finally {
         if (!signal.aborted) this._facetsLoading = false;
       }
@@ -451,13 +498,32 @@ export class OlSearchBar extends LitElement {
     .scan-btn:hover { background:hsl(0,0%,96%); border-color:hsl(0,0%,70%); }
     .scan-btn img { display:block; width:18px; height:18px; }
 
-    /* Panel (droppable mode only) */
+    /* Trigger button (droppable mode): looks like an input but opens the panel overlay */
+    .trigger-btn {
+      flex:1; min-width:0; border:none; outline:none; cursor:pointer;
+      background:transparent; font-size:14px; font-family:inherit;
+      padding:2px 4px; text-align:left; color:hsl(0,0%,15%);
+      overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+    }
+    .trigger-placeholder { color:hsl(0,0%,52%); }
+
+    /* Panel-input row: real search input that lives inside the panel overlay */
+    .panel-input-row {
+      display:flex; align-items:center; min-width:0; gap:6px;
+      padding:6px 8px; border-bottom:1px solid hsl(0,0%,90%);
+      background:white; border-radius:6.5px 6.5px 0 0;
+    }
+
+    /* Panel (droppable mode only) — position driven by CSS custom props set in _positionPanel() */
     .panel {
-      position:absolute; top:calc(100% - 1.5px); left:0; right:0;
+      position:fixed;
+      top:var(--ol-panel-top, auto);
+      right:var(--ol-panel-right, 0px);
+      width:var(--ol-panel-width, 600px);
+      left:var(--ol-panel-left, auto);
       background:white;
       border:1.5px solid hsl(202,96%,37%);
-      border-top:none;
-      border-radius:0 0 8px 8px;
+      border-radius:8px;
       box-shadow:0 12px 32px rgba(0,0,0,.16);
       z-index:500; overflow:visible;
     }
@@ -467,7 +533,6 @@ export class OlSearchBar extends LitElement {
       display:flex; border-bottom:1px solid hsl(0,0%,90%);
       background:hsl(0,0%,98.5%);
     }
-    .pf-bar--round { border-radius: 0 0 9px 9px; }
     .pf-wrap { flex:1; position:relative; display:flex; }
     .pf-wrap + .pf-wrap { border-left:1px solid hsl(0,0%,90%); }
     .pf-wrap--cog { flex:0 0 38px; }
@@ -549,51 +614,61 @@ export class OlSearchBar extends LitElement {
     }
     .ac-see-all:hover { background:hsl(202,96%,28%); }
 
+    /* ── Narrow trigger: icon-only (magnifying glass + barcode), right-aligned ── */
+    @media (max-width: 785px) {
+      .search-outer { display: flex; justify-content: flex-end; }
+      .input-row,
+      .input-row:focus-within,
+      .search-outer.open .input-row {
+        border: none; box-shadow: none; background: transparent;
+        padding: 0; border-radius: 8px; flex: none; gap: 6px;
+      }
+      .input-row .trigger-btn { display: none; }
+      .input-row .submit { margin-left: 0; }
+    }
+
+    /* ── Full-screen overlay — active whenever _mobileExpanded=true (any viewport) ── */
+    :host(.mobile-exp) {
+      position: fixed; inset: 0; z-index: 9000;
+      width: 100dvw; height: 100dvh;
+      display: flex; flex-direction: column;
+      background: white; overflow: hidden;
+    }
+    :host(.mobile-exp) .search-outer {
+      flex: 1; display: flex; flex-direction: column;
+    }
+    :host(.mobile-exp) .input-row { display: none; }
+    :host(.mobile-exp) .panel {
+      position: static; flex: 1;
+      width: 100%; box-sizing: border-box;
+      overflow: visible; max-height: none;
+      border: none; box-shadow: none; border-radius: 0;
+      border-top: none;
+    }
+    :host(.mobile-exp) .panel-chips { max-height: none; }
+    :host(.mobile-exp) .ac-scroll { max-height: 40vh; }
+    :host(.mobile-exp) .pf-bar { overflow: visible; flex-wrap: wrap; }
+
+    /* Back button shown at top of the expanded panel */
+    .mob-back-bar {
+      padding: 8px 12px 4px;
+      border-bottom: 1px solid hsl(0,0%,92%);
+      background: hsl(0,0%,98.5%);
+    }
+    .mob-back-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; font-family: inherit; color: hsl(202,96%,37%);
+      padding: 4px 0; font-weight: 500;
+    }
+    .mob-back-btn:hover { color: hsl(202,96%,28%); }
+
     @media (max-width: 600px) {
-      .panel { left: -4px; right: -4px; max-height: 80vh; overflow-y: auto; }
       .pf-bar { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
       .pf-bar::-webkit-scrollbar { display: none; }
       .pf-btn { font-size: 10px; padding: 11px 4px; }
       .submit { padding: 6px 10px; }
       .ac-scroll { max-height: 40vh; }
       .panel-chips { max-height: 72px; overflow-y: auto; }
-
-      /* ── Full-screen overlay (mobile-exp class toggled via JS) ── */
-      :host(.mobile-exp) {
-        position: fixed; inset: 0; z-index: 9000;
-        width: 100dvw; height: 100dvh;
-        display: flex; flex-direction: column;
-        background: white; overflow: hidden;
-      }
-      :host(.mobile-exp) .search-outer {
-        flex-shrink: 0; padding: 10px 12px;
-        border-bottom: 1.5px solid hsl(202,96%,37%);
-      }
-      :host(.mobile-exp) .search-outer.open .input-row {
-        border-bottom-left-radius: 8px;
-        border-bottom-right-radius: 8px;
-      }
-      :host(.mobile-exp) .panel {
-        position: static; flex: 1;
-        overflow-y: auto; max-height: none;
-        border: none; box-shadow: none; border-radius: 0;
-        border-top: none;
-      }
-      :host(.mobile-exp) .panel-chips { max-height: none; }
-      :host(.mobile-exp) .ac-scroll { max-height: none; }
-
-      /* Back button shown at top of the expanded panel */
-      .mob-back-bar {
-        padding: 8px 12px 4px;
-        border-bottom: 1px solid hsl(0,0%,92%);
-        background: hsl(0,0%,98.5%);
-      }
-      .mob-back-btn {
-        background: none; border: none; cursor: pointer;
-        font-size: 14px; font-family: inherit; color: hsl(202,96%,37%);
-        padding: 4px 0; font-weight: 500;
-      }
-      .mob-back-btn:hover { color: hsl(202,96%,28%); }
     }
   `;
 
@@ -655,15 +730,14 @@ export class OlSearchBar extends LitElement {
 
 
   // Order: avail → lang → genre → subject → author → sort → cog
-  _renderFacetBar(roundBottom = false) {
+  // Dropdowns in the first half open left-aligned; those after the midpoint open
+  // right-aligned so they don't overflow the edge of the panel on narrow viewports.
+  _renderFacetBar() {
+    const facets = ['avail', 'lang', 'genre', 'subject', 'author', 'sort'];
+    const mid    = Math.floor((facets.length - 1) / 2); // 2 for 6 facets
     return html`
-      <div class="pf-bar ${roundBottom ? 'pf-bar--round' : ''}">
-        ${this._renderFacetBtn('avail',  false, 'pf-wrap--first')}
-        ${this._renderFacetBtn('lang')}
-        ${this._renderFacetBtn('genre')}
-        ${this._renderFacetBtn('subject')}
-        ${this._renderFacetBtn('author')}
-        ${this._renderFacetBtn('sort', true)}
+      <div class="pf-bar">
+        ${facets.map((name, i) => this._renderFacetBtn(name, i > mid, i === 0 ? 'pf-wrap--first' : ''))}
         <div class="pf-wrap pf-wrap--cog pf-wrap--last">
           <button class="pf-btn" title="Search help"
                   @click=${e => { e.stopPropagation(); this._howtoOpen = true; }}>⚙️</button>
@@ -672,73 +746,152 @@ export class OlSearchBar extends LitElement {
       <ol-howto-modal .open=${this._howtoOpen} @close=${() => this._howtoOpen = false}></ol-howto-modal>`;
   }
 
-  // ── Render ────────────────────────────────────────────────────
-  render() {
-    const q = this._q.trim();
-    const showResults = q.length >= 2 || this._hasActiveFilters();
-
-    // Droppable: derive chips from local filter state.
-    // Embedded: use chips prop passed in by the parent.
-    const chips = this.showFacets
-      ? buildChips(this._localFilters)
-      : (this.chips ?? []);
-
-    const chipItems = chips.map(c => html`
+  // ── Shared render helpers ──────────────────────────────────────
+  _renderChipItems(chips) {
+    return chips.map(c => html`
       <span class="chip chip-${c.type}">
         ${c.label}
         <button class="chip-x"
                 @click=${e => { e.stopPropagation(); this._handleChipRemove(c); }}>×</button>
       </span>`);
+  }
 
+  _renderResults(q) {
+    const showResults = q.length >= 2 || this._hasActiveFilters();
+    if (this._loading) return html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>`;
+    if (!showResults)  return html`<div class="ac-hint-msg" aria-live="polite">Start typing to search, or pick a filter above…</div>`;
     return html`
-      <div class="search-outer ${this._open ? 'open' : ''}"
-           role="search">
-        <div class="input-row">
-          <div class="input-controls">
-            <input class="text-input" type="text" autocomplete="off"
-                   placeholder="${this.placeholder}" .value=${this._q}
-                   role="combobox"
-                   aria-label="${this.placeholder}"
-                   aria-expanded=${this._open && this.showFacets ? 'true' : 'false'}
-                   aria-autocomplete="list"
-                   aria-haspopup="listbox"
-                   aria-controls="ac-listbox"
-                   aria-activedescendant=${this._acFocusIdx >= 0 ? `ac-opt-${this._acFocusIdx}` : nothing}
-                   @focus=${this._onFocus}
-                   @input=${this._onInput}
-                   @keydown=${this._onKeyDown}>
+      <div class="ac-scroll" id="ac-listbox" role="listbox" aria-label="Search suggestions">
+        ${this._suggestions.length === 0
+          ? html`<div class="ac-empty" aria-live="polite">No results</div>`
+          : this._suggestions.map((w, idx) => {
+              const ed = bestEdition(w.editions);
+              const coverId = ed?.cover_i ?? w.cover_i;
+              const edOlid  = ed?.key?.split('/').pop();
+              const wOlid   = w.key?.split('/').pop();
+              const linkKey = ed?.key ?? w.key;
+              const access  = ed?.ebook_access ?? w.ebook_access;
+              const cover = edOlid  ? `https://covers.openlibrary.org/b/olid/${edOlid}-S.jpg`
+                          : coverId ? `https://covers.openlibrary.org/b/id/${coverId}-S.jpg`
+                          : wOlid   ? `https://covers.openlibrary.org/b/olid/${wOlid}-S.jpg`
+                          : null;
+              const isReadable = access === 'public' || access === 'borrowable';
+              return html`
+                <a class="ac-row ${this._acFocusIdx === idx ? 'focused' : ''}"
+                   id="ac-opt-${idx}"
+                   href="${this.siteBase}${linkKey}"
+                   target="_blank" rel="noopener"
+                   role="option"
+                   @click=${() => { this._open = false; this._mobileExpanded = false; }}>
+                  ${cover
+                    ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
+                    : html`<div class="ac-blank">📖</div>`}
+                  <div class="ac-body">
+                    <div class="ac-title">${ed?.title ?? w.title}</div>
+                    <div class="ac-author">${(w.author_name ?? []).slice(0,2).join(', ')}</div>
+                    ${w.first_publish_year ? html`<div class="ac-year">${w.first_publish_year}</div>` : ''}
+                  </div>
+                  <div class="ac-meta">
+                    <span class="ac-badge ${isReadable ? 'ac-badge--readable' : 'ac-badge--catalog'}">
+                      ${isReadable ? 'Readable' : 'Catalog'}
+                    </span>
+                    ${w.ratings_average
+                      ? html`<span class="ac-star">★ ${w.ratings_average.toFixed(1)}</span>`
+                      : ''}
+                  </div>
+                </a>`;})}
+      </div>
+      <div class="ac-foot">
+        <a class="ac-add-book" href="${this.siteBase}/books/add"
+           target="_blank" rel="noopener"
+           @click=${e => e.stopPropagation()}>+ Add Book</a>
+        <button class="ac-see-all" @click=${() => {
+          this._open = false; this._mobileExpanded = false;
+          if (!q && !this._hasActiveFilters()) return;
+          this.dispatchEvent(new CustomEvent('ol-search', {
+            detail: { q, filters: this._localFilters }, bubbles: true, composed: true,
+          }));
+        }}>See all ${this._total.toLocaleString()} results →</button>
+      </div>`;
+  }
 
-            ${this._q ? html`
-              <button class="clear-btn" aria-label="Clear search"
-                      @click=${e => { e.stopPropagation(); this._clearInput(); }}>✕</button>
-            ` : ''}
+  // ── Render ────────────────────────────────────────────────────
+  render() {
+    const q        = this._q.trim();
+    const chips    = this.showFacets ? buildChips(this._localFilters) : (this.chips ?? []);
+    const chipItems = this._renderChipItems(chips);
 
-            <button class="submit" @click=${() => this._submit()} aria-label="Search">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-              </svg>
-            </button>
-            <span class="scan-sep"></span>
-            <a class="scan-btn" title="Scan ISBN barcode"
-               href="${this.siteBase}/barcodescanner?returnTo=/isbn/$$$"
-               target="_blank" rel="noopener"
-               @click=${e => e.stopPropagation()}>
-              <img src="${this.siteBase}/static/images/icons/barcode_scanner.svg"
-                   alt="Scan barcode" width="18" height="18">
-            </a>
+    // ── Embedded (search-page) mode: real input, no panel ────────
+    if (!this.showFacets) {
+      return html`
+        <div class="search-outer" role="search">
+          <div class="input-row">
+            <div class="input-controls">
+              <input class="text-input" type="text" autocomplete="off"
+                     placeholder="${this.placeholder}" .value=${this._q}
+                     @input=${this._onInput}
+                     @keydown=${this._onKeyDown}>
+              ${this._q ? html`
+                <button class="clear-btn" aria-label="Clear search"
+                        @click=${e => { e.stopPropagation(); this._clearInput(); }}>✕</button>
+              ` : ''}
+              <button class="submit" @click=${() => this._submit()} aria-label="Search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                </svg>
+              </button>
+              <span class="scan-sep"></span>
+              <a class="scan-btn" title="Scan ISBN barcode"
+                 href="${this.siteBase}/barcodescanner?returnTo=/isbn/$$$"
+                 target="_blank" rel="noopener"
+                 @click=${e => e.stopPropagation()}>
+                <img src="${this.siteBase}/static/images/icons/barcode_scanner.svg"
+                     alt="Scan barcode" width="18" height="18">
+              </a>
+            </div>
           </div>
+          ${chips.length ? html`
+            <div class="chip-bar">
+              ${chipItems}
+              ${this._hasActiveFilters() ? html`<button class="clear-all-btn"
+                      aria-label="Clear all filters"
+                      @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
+            </div>` : ''}
+        </div>`;
+    }
+
+    // ── Droppable (header) mode: trigger button + fixed panel overlay ──
+    return html`
+      <div class="search-outer ${this._open ? 'open' : ''}" role="search">
+
+        <!-- Trigger: a styled button that looks like a search input but opens the panel -->
+        <div class="input-row">
+          <button class="trigger-btn"
+                  @click=${this._onTriggerClick}
+                  aria-expanded=${this._open ? 'true' : 'false'}
+                  aria-haspopup="true"
+                  aria-controls="search-panel"
+                  aria-label="${this.placeholder}">
+            <span class="${!this._q ? 'trigger-placeholder' : ''}">${this._q || this.placeholder}</span>
+          </button>
+          <button class="submit" @click=${this._onTriggerClick} aria-label="Search">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
+          </button>
+          <span class="scan-sep"></span>
+          <a class="scan-btn" title="Scan ISBN barcode"
+             href="${this.siteBase}/barcodescanner?returnTo=/isbn/$$$"
+             target="_blank" rel="noopener"
+             @click=${e => e.stopPropagation()}>
+            <img src="${this.siteBase}/static/images/icons/barcode_scanner.svg"
+                 alt="Scan barcode" width="18" height="18">
+          </a>
         </div>
 
-        ${!this.showFacets && chips.length ? html`
-          <div class="chip-bar">
-            ${chipItems}
-            ${this._hasActiveFilters() ? html`<button class="clear-all-btn"
-                    aria-label="Clear all filters"
-                    @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
-          </div>` : ''}
-
-        ${this.showFacets && this._open ? html`
-          <div class="panel">
+        <!-- Panel overlay (position:fixed via CSS vars set by _positionPanel) -->
+        ${this._open ? html`
+          <div class="panel" id="search-panel" role="dialog" aria-modal=${this._mobileExpanded ? 'true' : 'false'} aria-label="${this.placeholder}">
             ${this._mobileExpanded ? html`
               <div class="mob-back-bar">
                 <button class="mob-back-btn" aria-label="Close search"
@@ -746,6 +899,39 @@ export class OlSearchBar extends LitElement {
                   ← Back
                 </button>
               </div>` : nothing}
+
+            <!-- Real search input at top of panel -->
+            <div class="panel-input-row">
+              <input class="text-input panel-input" type="text" autocomplete="off"
+                     placeholder="${this.placeholder}" .value=${this._q}
+                     role="combobox"
+                     aria-label="${this.placeholder}"
+                     aria-expanded="true"
+                     aria-autocomplete="list"
+                     aria-haspopup="listbox"
+                     aria-controls="ac-listbox"
+                     aria-activedescendant=${this._acFocusIdx >= 0 ? `ac-opt-${this._acFocusIdx}` : nothing}
+                     @input=${this._onInput}
+                     @keydown=${this._onKeyDown}>
+              ${this._q ? html`
+                <button class="clear-btn" aria-label="Clear search"
+                        @click=${e => { e.stopPropagation(); this._clearInput(); }}>✕</button>
+              ` : ''}
+              <button class="submit" @click=${() => this._submit()} aria-label="Search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                </svg>
+              </button>
+              <span class="scan-sep"></span>
+              <a class="scan-btn" title="Scan ISBN barcode"
+                 href="${this.siteBase}/barcodescanner?returnTo=/isbn/$$$"
+                 target="_blank" rel="noopener"
+                 @click=${e => e.stopPropagation()}>
+                <img src="${this.siteBase}/static/images/icons/barcode_scanner.svg"
+                     alt="Scan barcode" width="18" height="18">
+              </a>
+            </div>
+
             ${chips.length ? html`
               <div class="panel-chips">
                 ${chipItems}
@@ -753,65 +939,10 @@ export class OlSearchBar extends LitElement {
                         aria-label="Clear all filters"
                         @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
               </div>` : ''}
-            ${this._renderFacetBar(!this._loading && !showResults)}
-
-            ${this._loading ? html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>` : showResults ? html`
-              <div class="ac-scroll" id="ac-listbox" role="listbox" aria-label="Search suggestions">
-                ${this._suggestions.length === 0
-                  ? html`<div class="ac-empty" aria-live="polite">No results</div>`
-                  : this._suggestions.map((w, idx) => {
-                      const ed = bestEdition(w.editions);
-                      const coverId = ed?.cover_i ?? w.cover_i;
-                      const edOlid  = ed?.key?.split('/').pop();
-                      const wOlid   = w.key?.split('/').pop();
-                      const linkKey = ed?.key ?? w.key;
-                      const access  = ed?.ebook_access ?? w.ebook_access;
-                      const cover = edOlid  ? `https://covers.openlibrary.org/b/olid/${edOlid}-S.jpg`
-                                  : coverId ? `https://covers.openlibrary.org/b/id/${coverId}-S.jpg`
-                                  : wOlid   ? `https://covers.openlibrary.org/b/olid/${wOlid}-S.jpg`
-                                  : null;
-                      const isReadable = access === 'public' || access === 'borrowable';
-                      return html`
-                        <a class="ac-row ${this._acFocusIdx === idx ? 'focused' : ''}"
-                           id="ac-opt-${idx}"
-                           href="${this.siteBase}${linkKey}"
-                           target="_blank" rel="noopener"
-                           role="option"
-                           @click=${() => this._open = false}>
-                          ${cover
-                            ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
-                            : html`<div class="ac-blank">📖</div>`}
-                          <div class="ac-body">
-                            <div class="ac-title">${ed?.title ?? w.title}</div>
-                            <div class="ac-author">${(w.author_name ?? []).slice(0,2).join(', ')}</div>
-                            ${w.first_publish_year ? html`<div class="ac-year">${w.first_publish_year}</div>` : ''}
-                          </div>
-                          <div class="ac-meta">
-                            <span class="ac-badge ${isReadable ? 'ac-badge--readable' : 'ac-badge--catalog'}">
-                              ${isReadable ? 'Readable' : 'Catalog'}
-                            </span>
-                            ${w.ratings_average
-                              ? html`<span class="ac-star">★ ${w.ratings_average.toFixed(1)}</span>`
-                              : ''}
-                          </div>
-                        </a>`;})}
-              </div>
-              <div class="ac-foot">
-                <a class="ac-add-book" href="${this.siteBase}/books/add"
-                   target="_blank" rel="noopener"
-                   @click=${e => e.stopPropagation()}>+ Add Book</a>
-                <button class="ac-see-all" @click=${() => {
-                  this._open = false;
-                  if (!q && !this._hasActiveFilters()) return;
-                  this.dispatchEvent(new CustomEvent('ol-search', {
-                    detail: { q, filters: this._localFilters }, bubbles: true, composed: true,
-                  }));
-                }}>See all ${this._total.toLocaleString()} results →</button>
-              </div>
-            ` : html`<div class="ac-hint-msg" aria-live="polite">Start typing to search, or pick a filter above…</div>`}
+            ${this._renderFacetBar()}
+            ${this._renderResults(q)}
           </div>` : ''}
-      </div>
-    `;
+      </div>`;
   }
 }
 

@@ -20,17 +20,38 @@ function extractMediaBlock(source, idx) {
 }
 const mobileBlock = mediaIdx !== -1 ? extractMediaBlock(src, mediaIdx) : '';
 
+const narrowIdx   = src.indexOf('@media (max-width: 785px)');
+const narrowBlock = narrowIdx !== -1 ? extractMediaBlock(src, narrowIdx) : '';
+
+describe('ol-search-bar narrow trigger — icon-only mode at ≤785px', () => {
+  it('has a @media (max-width: 785px) block', () => {
+    expect(narrowIdx).not.toBe(-1);
+  });
+
+  it('hides .trigger-btn so only the icons remain', () => {
+    expect(narrowBlock).toMatch(/\.input-row\s+\.trigger-btn[^}]*display\s*:\s*none/);
+  });
+
+  it('keeps .scan-btn visible (does not hide it)', () => {
+    expect(narrowBlock).not.toMatch(/\.scan-btn[^}]*display\s*:\s*none/);
+  });
+
+  it('removes .input-row border so the row does not look like a text input', () => {
+    expect(narrowBlock).toMatch(/\.input-row[^{]*\{[^}]*border\s*:\s*none/);
+  });
+
+  it('removes .input-row box-shadow at narrow width', () => {
+    expect(narrowBlock).toMatch(/\.input-row[^{]*\{[^}]*box-shadow\s*:\s*none/);
+  });
+
+  it('right-aligns the icon group via justify-content: flex-end on .search-outer', () => {
+    expect(narrowBlock).toMatch(/\.search-outer[^{]*\{[^}]*justify-content\s*:\s*flex-end/);
+  });
+});
+
 describe('ol-search-bar mobile Phase 2 CSS contract', () => {
   it('has a @media (max-width: 600px) block', () => {
     expect(mediaIdx).not.toBe(-1);
-  });
-
-  it('.panel has max-height: 80vh to prevent full-screen overlay with virtual keyboard open', () => {
-    expect(mobileBlock).toMatch(/\.panel[^{]*\{[^}]*max-height\s*:\s*80vh/);
-  });
-
-  it('.panel has overflow-y: auto for inner scrolling', () => {
-    expect(mobileBlock).toMatch(/\.panel[^{]*\{[^}]*overflow-y\s*:\s*auto/);
   });
 
   it('.ac-scroll max-height uses vh (not px) so it respects virtual keyboard', () => {

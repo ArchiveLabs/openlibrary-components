@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
 import {
   SORT_OPTIONS, AVAILABILITY_OPTIONS, LANGUAGE_OPTIONS, GENRE_OPTIONS, FICTION_OPTIONS,
   toggleArrayValue,
@@ -273,7 +274,7 @@ export class OlFacetDrop extends LitElement {
         ${unselVisible.length === 0
           ? html`<div class="empty">${this._langSearch ? 'No matches' : 'All selected'}</div>`
           : ''}
-        ${unselVisible.map(o => html`
+        ${repeat(unselVisible, o => o.value, o => html`
           <button class="item"
               @click=${() => this._change('languages', toggleArrayValue(selected, o.value), true)}>
             <input type="checkbox" .checked=${false} readonly> ${o.label}
@@ -325,7 +326,7 @@ export class OlFacetDrop extends LitElement {
         ${unselVisible.length === 0
           ? html`<div class="empty">${this._genreSearch ? 'No matches' : 'All selected'}</div>`
           : ''}
-        ${unselVisible.map(o => html`
+        ${repeat(unselVisible, o => o.value, o => html`
           <button class="item"
               @click=${() => this._change('genres', toggleArrayValue(selectedGenres, o.value), true)}>
             <input type="checkbox" .checked=${false} readonly> ${o.label}
@@ -377,7 +378,7 @@ export class OlFacetDrop extends LitElement {
           ? html`<div class="hint">Type to search authors</div>` : ''}
         ${searching && !this.facetsLoading && this.authorResults.length === 0
           ? html`<div class="empty">No authors found</div>` : ''}
-        ${!this.facetsLoading ? unselSugg.map(a => html`
+        ${!this.facetsLoading ? repeat(unselSugg, a => a.name, a => html`
           <button class="item"
               @click=${() => this._change('authors', toggleArrayValue(selectedAuthors, a.name), true)}>
             <input type="checkbox" .checked=${false} readonly>
@@ -430,7 +431,7 @@ export class OlFacetDrop extends LitElement {
           ? html`<div class="hint">Type to search subjects</div>` : ''}
         ${searching && !this.facetsLoading && this.subjectResults.length === 0
           ? html`<div class="empty">No subjects found</div>` : ''}
-        ${!this.facetsLoading ? unselSugg.map(s => html`
+        ${!this.facetsLoading ? repeat(unselSugg, s => s.name, s => html`
           <button class="item"
               @click=${() => this._change('subjects', toggleArrayValue(selectedSubjects, s.name), true)}>
             <input type="checkbox" .checked=${false} readonly>
