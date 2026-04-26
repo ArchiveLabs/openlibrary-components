@@ -730,15 +730,14 @@ export class OlSearchBar extends LitElement {
 
 
   // Order: avail → lang → genre → subject → author → sort → cog
+  // Dropdowns in the first half open left-aligned; those after the midpoint open
+  // right-aligned so they don't overflow the edge of the panel on narrow viewports.
   _renderFacetBar() {
+    const facets = ['avail', 'lang', 'genre', 'subject', 'author', 'sort'];
+    const mid    = Math.floor((facets.length - 1) / 2); // 2 for 6 facets
     return html`
       <div class="pf-bar">
-        ${this._renderFacetBtn('avail',  false, 'pf-wrap--first')}
-        ${this._renderFacetBtn('lang')}
-        ${this._renderFacetBtn('genre')}
-        ${this._renderFacetBtn('subject')}
-        ${this._renderFacetBtn('author')}
-        ${this._renderFacetBtn('sort', true)}
+        ${facets.map((name, i) => this._renderFacetBtn(name, i > mid, i === 0 ? 'pf-wrap--first' : ''))}
         <div class="pf-wrap pf-wrap--cog pf-wrap--last">
           <button class="pf-btn" title="Search help"
                   @click=${e => { e.stopPropagation(); this._howtoOpen = true; }}>⚙️</button>

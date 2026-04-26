@@ -151,6 +151,58 @@ test.describe('mobile overlay — Author facet layout stability', () => {
     await page.screenshot({ path: 'tests/screenshots/mobile-author-drop-visible.png' });
   });
 
+  test('first-half facets open left-aligned; second-half facets open right-aligned', async ({ page }) => {
+    await openMobileOverlay(page);
+
+    // Facet order: avail(0) lang(1) genre(2) | subject(3) author(4) sort(5)
+    // Mid = floor((6-1)/2) = 2, so indices 0-2 → left-aligned, 3-5 → right-aligned.
+    const leftFacets  = [FACET_IDX.avail, FACET_IDX.lang, FACET_IDX.genre];
+    const rightFacets = [FACET_IDX.subject, FACET_IDX.author, FACET_IDX.sort];
+
+    for (const idx of leftFacets) {
+      await clickFacetBtn(page, idx);
+      await page.waitForFunction(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
+      }, { timeout: 2000 });
+
+      // ol-facet-drop must NOT have the [right] attribute
+      const hasRight = await page.evaluate(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop')?.hasAttribute('right') ?? null;
+      });
+      expect(hasRight).toBe(false);
+
+      // Close it before opening the next
+      await clickFacetBtn(page, idx);
+      await page.waitForFunction(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop') === null;
+      }, { timeout: 1000 });
+    }
+
+    for (const idx of rightFacets) {
+      await clickFacetBtn(page, idx);
+      await page.waitForFunction(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop') !== null;
+      }, { timeout: 2000 });
+
+      // ol-facet-drop MUST have the [right] attribute
+      const hasRight = await page.evaluate(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop')?.hasAttribute('right') ?? null;
+      });
+      expect(hasRight).toBe(true);
+
+      await clickFacetBtn(page, idx);
+      await page.waitForFunction(() => {
+        const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+        return sb?.shadowRoot?.querySelector('ol-facet-drop') === null;
+      }, { timeout: 1000 });
+    }
+  });
+
   test('other facets remain visible and not displaced when Author is open', async ({ page }) => {
     await openMobileOverlay(page);
 
