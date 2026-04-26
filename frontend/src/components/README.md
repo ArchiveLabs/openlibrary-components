@@ -15,7 +15,7 @@ The root application component. Owns **all filter and search state**.
 - `_availability`, `_fictionFilter`, `_languages`, `_genres`, `_authors`, `_subjects`, `_sort` — canonical filter state
 - Computes `_chips` (from `buildChips()`) and `_filters` (shape object) as derived getters
 - Renders hero mode (`ol-search-bar` with `showFacets=true`) or results mode (search bar + filter bar + book cards)
-- Handles `ol-search`, `ol-filter-change`, `ol-chip-remove` events
+- Handles `ol-search`, `ol-filter-change` events
 
 **Mode switching:** `_lastQ === null` → hero; otherwise results.
 
@@ -35,8 +35,7 @@ Search input with chips + autocomplete panel. **Display-only for filters** — r
 
 **Events emitted:**
 - `ol-search` — `{ q }` when user submits
-- `ol-chip-remove` — `{ type, value }` when × is clicked on a chip
-- `ol-filter-change` — `{ filter, value }` when a facet changes (only in hero mode)
+- `ol-filter-change` — `{ filter, value }` when a facet changes or a chip × is clicked (both modes)
 
 **Facet bar order (dropdown mode):** avail | lang | genre | author | subject | ⚙️ | sort
 

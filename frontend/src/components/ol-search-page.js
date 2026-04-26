@@ -106,9 +106,8 @@ export class OlSearchPage extends LitElement {
     this._onDoc = e => {
       if (!e.composedPath().includes(this)) this._openFacet = null;
     };
-    this._globalSearch         = e => this._onSearch(e);
-    this._globalFilterChange   = e => this._onFilterChange(e);
-    this._globalChipRemove     = e => this._onChipRemove(e);
+    this._globalSearch          = e => this._onSearch(e);
+    this._globalFilterChange    = e => this._onFilterChange(e);
     this._globalClearAllFilters = () => this._onClearAllFilters();
   }
 
@@ -119,7 +118,6 @@ export class OlSearchPage extends LitElement {
     // Using this (not window) prevents accidental coupling with other page scripts.
     this.addEventListener('ol-search',            this._globalSearch);
     this.addEventListener('ol-filter-change',     this._globalFilterChange);
-    this.addEventListener('ol-chip-remove',       this._globalChipRemove);
     this.addEventListener('ol-clear-all-filters', this._globalClearAllFilters);
     const q = new URLSearchParams(location.search).get('q');
     if (q) { this._lastQ = q; this._runSearch(1); }
@@ -144,7 +142,6 @@ export class OlSearchPage extends LitElement {
     document.removeEventListener('click', this._onDoc);
     this.removeEventListener('ol-search',            this._globalSearch);
     this.removeEventListener('ol-filter-change',     this._globalFilterChange);
-    this.removeEventListener('ol-chip-remove',       this._globalChipRemove);
     this.removeEventListener('ol-clear-all-filters', this._globalClearAllFilters);
   }
 
@@ -270,20 +267,6 @@ export class OlSearchPage extends LitElement {
       case 'genres':        this._genres        = value; break;
       case 'authors':       this._authors       = value; break;
       case 'subjects':      this._subjects      = value; break;
-    }
-    if (this._lastQ !== null) this._runSearch(1);
-  }
-
-  // ── Chip removal ──────────────────────────────────────────────
-  _onChipRemove(e) {
-    const { type, value } = e.detail;
-    switch (type) {
-      case 'access':  this._availability  = ''; break;
-      case 'fiction': this._fictionFilter = ''; break;
-      case 'lang':    this._languages     = []; break;
-      case 'genre':   this._genres        = this._genres.filter(v => v !== value); break;
-      case 'author':  this._authors       = this._authors.filter(v => v !== value); break;
-      case 'subject': this._subjects      = this._subjects.filter(v => v !== value); break;
     }
     if (this._lastQ !== null) this._runSearch(1);
   }

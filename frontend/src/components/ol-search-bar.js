@@ -21,7 +21,7 @@ import './ol-facet-drop.js';
  *   showFacets=false (embedded / search-page mode)
  *     - chips passed as prop, shown in input row
  *     - NO panel — just a query input; submit triggers ol-search
- *     - chip × fires ol-chip-remove so the parent updates its state
+ *     - chip × fires ol-filter-change (same event as droppable mode)
  */
 export class OlSearchBar extends LitElement {
   static properties = {
@@ -331,9 +331,20 @@ export class OlSearchBar extends LitElement {
       else if (c.type === 'author')  this._emitFilter('authors',   (f.authors   ?? []).filter(v => v !== c.value));
       else if (c.type === 'subject') this._emitFilter('subjects',  (f.subjects  ?? []).filter(v => v !== c.value));
     } else {
-      this.dispatchEvent(new CustomEvent('ol-chip-remove', {
-        detail: { type: c.type, value: c.value }, bubbles: true, composed: true,
-      }));
+      // Embedded: compute the new value and emit the same ol-filter-change as droppable mode.
+      const f = this._localFilters;
+      let filter, value;
+      if      (c.type === 'access')  { filter = 'availability';  value = ''; }
+      else if (c.type === 'fiction') { filter = 'fictionFilter'; value = ''; }
+      else if (c.type === 'lang')    { filter = 'languages';     value = []; }
+      else if (c.type === 'genre')   { filter = 'genres';        value = (f.genres    ?? []).filter(v => v !== c.value); }
+      else if (c.type === 'author')  { filter = 'authors';       value = (f.authors   ?? []).filter(v => v !== c.value); }
+      else if (c.type === 'subject') { filter = 'subjects';      value = (f.subjects  ?? []).filter(v => v !== c.value); }
+      if (filter !== undefined) {
+        this.dispatchEvent(new CustomEvent('ol-filter-change', {
+          detail: { filter, value }, bubbles: true, composed: true,
+        }));
+      }
     }
   }
 
