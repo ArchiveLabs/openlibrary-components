@@ -48,6 +48,7 @@ export class OlSearchBar extends LitElement {
     _facetsLoading:    { state: true },
     _acFocusIdx:       { state: true },  // keyboard-focused autocomplete result index
     _mobileExpanded:   { state: true },  // full-screen overlay active on narrow viewport
+    _acError:          { state: true },  // true when autocomplete fetch fails (non-abort)
   };
 
   constructor() {
@@ -65,6 +66,7 @@ export class OlSearchBar extends LitElement {
     this._open          = false;
     this._loading       = false;
     this._total         = 0;
+    this._acError       = false;
     this._timer         = null;
     this._localFilters  = { ...EMPTY_FILTERS };
 
@@ -218,6 +220,7 @@ export class OlSearchBar extends LitElement {
     this._acAbort?.abort();
     this._acAbort = new AbortController();
     const { signal } = this._acAbort;
+    this._acError = false;
 
     const q = this._q.trim();
     const f = this._localFilters;
@@ -237,6 +240,7 @@ export class OlSearchBar extends LitElement {
     } catch (err) {
       if (err.name !== 'AbortError') {
         this._suggestions = []; this._total = 0; this._acFocusIdx = -1;
+        this._acError = true;
       }
     } finally {
       if (!signal.aborted) this._loading = false;
@@ -566,6 +570,10 @@ export class OlSearchBar extends LitElement {
     .ac-spin, .ac-hint-msg, .ac-empty {
       padding:16px; text-align:center; font-size:13px; color:hsl(0,0%,55%);
     }
+    .ac-error {
+      padding:16px; text-align:center; font-size:13px;
+      color:hsl(0,72%,40%); background:hsl(0,72%,97%);
+    }
     .ac-row {
       display:flex; align-items:center; gap:12px; padding:10px 14px;
       text-decoration:none; border-bottom:1px solid hsl(0,0%,94%);
@@ -759,6 +767,7 @@ export class OlSearchBar extends LitElement {
   _renderResults(q) {
     const showResults = q.length >= 2 || this._hasActiveFilters();
     if (this._loading) return html`<div class="ac-spin" role="status" aria-live="polite">Searching…</div>`;
+    if (this._acError) return html`<div class="ac-error" role="alert">Search is unavailable — check your connection and try again.</div>`;
     if (!showResults)  return html`<div class="ac-hint-msg" aria-live="polite">Start typing to search, or pick a filter above…</div>`;
     return html`
       <div class="ac-scroll" id="ac-listbox" role="listbox" aria-label="Search suggestions">
