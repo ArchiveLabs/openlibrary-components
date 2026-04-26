@@ -31,7 +31,7 @@ Search input with chips + autocomplete panel. **Display-only for filters** — r
 - `q: String` — controlled query string (synced to internal `_q`)
 - `chips: Array` — `{ type, label, value }[]` rendered as colored pills
 - `showFacets: Boolean` — when true, renders the facet bar inside the open panel (hero mode)
-- `filters: Object` — current filter state (read-only; only used when `showFacets=true`)
+- `filters: Object` — current filter state. In droppable mode, seeds local state. In embedded mode, **required alongside `.chips`** so that multi-value chip removal (genre/author/subject) can compute the correct new array value.
 
 **Events emitted:**
 - `ol-search` — `{ q }` when user submits

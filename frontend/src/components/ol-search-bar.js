@@ -19,9 +19,12 @@ import './ol-facet-drop.js';
  *     - ol-search includes { q, filters } so search page can carry them over
  *
  *   showFacets=false (embedded / search-page mode)
- *     - chips passed as prop, shown in input row
+ *     - chips and filters passed as props, shown in input row
  *     - NO panel — just a query input; submit triggers ol-search
  *     - chip × fires ol-filter-change (same event as droppable mode)
+ *     - IMPORTANT: pass both .chips and .filters — multi-value chip removal
+ *       (genre/author/subject) needs the full current filter arrays to compute
+ *       the updated value correctly
  */
 export class OlSearchBar extends LitElement {
   static properties = {
@@ -331,8 +334,10 @@ export class OlSearchBar extends LitElement {
       else if (c.type === 'author')  this._emitFilter('authors',   (f.authors   ?? []).filter(v => v !== c.value));
       else if (c.type === 'subject') this._emitFilter('subjects',  (f.subjects  ?? []).filter(v => v !== c.value));
     } else {
-      // Embedded: compute the new value and emit the same ol-filter-change as droppable mode.
-      const f = this._localFilters;
+      // Embedded: emit ol-filter-change so the parent can update its canonical state.
+      // Use this.filters (prop) as source of truth for multi-value arrays; _localFilters
+      // may lag if the host passes only chips without the filters prop.
+      const f = this.filters ?? this._localFilters;
       let filter, value;
       if      (c.type === 'access')  { filter = 'availability';  value = ''; }
       else if (c.type === 'fiction') { filter = 'fictionFilter'; value = ''; }
