@@ -62,12 +62,16 @@ const searchBarSrc = readFileSync(
 // These tests catch drift between the two.
 
 describe('ol-search-bar.js — CSS @media blocks match BREAKPOINTS values', () => {
-  it('CSS contains @media (max-width: 600px) matching BREAKPOINTS.mobile', () => {
-    expect(searchBarSrc).toMatch(/@media[^{]*max-width:\s*600px/);
+  it('CSS contains @media (max-width: <mobile>px) matching BREAKPOINTS.mobile', () => {
+    expect(searchBarSrc).toMatch(
+      new RegExp(`@media[^{]*max-width:\\s*${BREAKPOINTS.mobile}px`),
+    );
   });
 
-  it('CSS contains @media (max-width: 785px) matching BREAKPOINTS.narrow', () => {
-    expect(searchBarSrc).toMatch(/@media[^{]*max-width:\s*785px/);
+  it('CSS contains @media (max-width: <narrow>px) matching BREAKPOINTS.narrow', () => {
+    expect(searchBarSrc).toMatch(
+      new RegExp(`@media[^{]*max-width:\\s*${BREAKPOINTS.narrow}px`),
+    );
   });
 });
 
