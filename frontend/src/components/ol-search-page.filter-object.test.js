@@ -96,13 +96,31 @@ describe('ol-search-page filter consolidation — mutation via spread', () => {
 
 describe('ol-search-page filter consolidation — updated() watches _filters', () => {
   it('updated() checks changed.has("_filters") not individual filter props', () => {
-    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 300);
+    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 600);
     expect(fn).toMatch(/changed\.has\s*\(\s*['"]_filters['"]\s*\)/);
   });
 
   it('updated() does not check changed.has("_sort")', () => {
-    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 300);
+    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 600);
     expect(fn).not.toMatch(/changed\.has\s*\(\s*['"]_sort['"]\s*\)/);
+  });
+});
+
+// ── Key validation ────────────────────────────────────────────────────────────
+
+describe('ol-search-page filter consolidation — key validation', () => {
+  it('FILTER_KEYS set is derived from DEFAULT_FILTERS so unknown keys are rejected', () => {
+    expect(src).toMatch(/FILTER_KEYS\s*=\s*new Set\s*\(\s*Object\.keys\s*\(\s*DEFAULT_FILTERS/);
+  });
+
+  it('_onFilterChange guards with FILTER_KEYS.has(filter)', () => {
+    const fn = src.slice(src.lastIndexOf('_onFilterChange(e)'), src.lastIndexOf('_onFilterChange(e)') + 200);
+    expect(fn).toMatch(/FILTER_KEYS\.has\s*\(\s*filter\s*\)/);
+  });
+
+  it('_rfApply guards with FILTER_KEYS.has(filter)', () => {
+    const fn = src.slice(src.indexOf('_rfApply('), src.indexOf('_rfApply(') + 200);
+    expect(fn).toMatch(/FILTER_KEYS\.has\s*\(\s*filter\s*\)/);
   });
 });
 
@@ -114,8 +132,8 @@ describe('ol-search-page filter consolidation — buildChips called inline', () 
     expect(renderFn).toMatch(/buildChips\s*\(\s*this\._filters\s*\)/);
   });
 
-  it('updated() dispatches ol-app-state with buildChips(this._filters) for chips', () => {
-    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 300);
-    expect(fn).toMatch(/buildChips\s*\(\s*this\._filters\s*\)/);
+  it('updated() dispatches ol-app-state with buildChips() for chips', () => {
+    const fn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 600);
+    expect(fn).toMatch(/buildChips\s*\(/);
   });
 });

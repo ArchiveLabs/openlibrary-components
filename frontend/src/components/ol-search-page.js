@@ -12,6 +12,7 @@ import {
 import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
 
 const LIMIT = 20;
+const FILTER_KEYS = new Set(Object.keys(DEFAULT_FILTERS));
 
 const SHOWCASE_BOOKS = [
   { olid: 'OL27448W',   title: 'The Lord of the Rings',        href: 'https://openlibrary.org/works/OL27448W' },
@@ -135,8 +136,14 @@ export class OlSearchPage extends LitElement {
 
   updated(changed) {
     if (changed.has('_lastQ') || changed.has('_filters')) {
+      const f = this._filters;
       window.dispatchEvent(new CustomEvent('ol-app-state', {
-        detail: { hasQuery: this._lastQ !== null, filters: this._filters, chips: buildChips(this._filters) },
+        detail: {
+          hasQuery: this._lastQ !== null,
+          // Defensive copy — listeners must not mutate internal state.
+          filters: { ...f, languages: [...f.languages], genres: [...f.genres], authors: [...f.authors], subjects: [...f.subjects] },
+          chips: buildChips(f),
+        },
       }));
     }
   }
@@ -149,13 +156,12 @@ export class OlSearchPage extends LitElement {
     const f = e.detail?.filters;
     if (f) {
       this._filters = {
-        sort:          f.sort          ?? DEFAULT_FILTERS.sort,
-        availability:  f.availability  ?? DEFAULT_FILTERS.availability,
-        fictionFilter: f.fictionFilter ?? DEFAULT_FILTERS.fictionFilter,
-        languages:     [...(f.languages ?? [])],
-        genres:        [...(f.genres    ?? [])],
-        authors:       [...(f.authors   ?? [])],
-        subjects:      [...(f.subjects  ?? [])],
+        ...DEFAULT_FILTERS,
+        ...f,
+        languages: [...(f.languages ?? [])],
+        genres:    [...(f.genres    ?? [])],
+        authors:   [...(f.authors   ?? [])],
+        subjects:  [...(f.subjects  ?? [])],
       };
     }
     const url = new URL(location.href);
@@ -224,6 +230,7 @@ export class OlSearchPage extends LitElement {
   // ── Filter changes from ol-search-bar ─────────────────────────
   _onFilterChange(e) {
     const { filter, value } = e.detail;
+    if (!FILTER_KEYS.has(filter)) return;
     this._filters = { ...this._filters, [filter]: value };
     if (this._lastQ !== null) this._runSearch(1);
   }
@@ -266,6 +273,7 @@ export class OlSearchPage extends LitElement {
 
   _rfApply(filter, value, keepOpen = false) {
     if (!keepOpen) this._openFacet = null;
+    if (!FILTER_KEYS.has(filter)) return;
     this._filters = { ...this._filters, [filter]: value };
     this._runSearch(1);
   }
