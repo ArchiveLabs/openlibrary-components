@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
 import {
   toggleArrayValue,
   shufflePick,
@@ -445,5 +446,26 @@ describe('DEFAULT_FILTERS', () => {
 
   it('EMPTY_FILTERS is still exported so existing import sites do not break', () => {
     expect(EMPTY_FILTERS).toBeDefined();
+  });
+});
+
+// ── FilterState typedef static-analysis ──────────────────────────────────────
+
+const filtersSrc = readFileSync(new URL('./filters.js', import.meta.url), 'utf8');
+
+describe('FilterState typedef', () => {
+  it('@typedef {Object} FilterState is declared in filters.js', () => {
+    expect(filtersSrc).toMatch(/@typedef\s*\{Object\}\s*FilterState/);
+  });
+
+  it('all seven filter fields are documented with @property', () => {
+    for (const field of ['sort', 'availability', 'fictionFilter', 'languages', 'genres', 'authors', 'subjects']) {
+      expect(filtersSrc).toMatch(new RegExp(`@property.*${field}`));
+    }
+  });
+
+  it('buildChips and buildSearchParams each have a @param {FilterState} annotation (2 total)', () => {
+    const matches = [...filtersSrc.matchAll(/@param\s*\{FilterState\}/g)];
+    expect(matches.length).toBeGreaterThanOrEqual(2);
   });
 });

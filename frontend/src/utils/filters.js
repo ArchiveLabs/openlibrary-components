@@ -120,6 +120,17 @@ export const POPULAR_AUTHORS = [
   'Chimamanda Ngozi Adichie', 'Kazuo Ishiguro', 'Salman Rushdie', 'Milan Kundera',
 ];
 
+/**
+ * @typedef {Object} FilterState
+ * @property {string}   sort           - '' | 'new' | 'old' | 'rating desc' | 'readinglog desc' | 'title'
+ * @property {string}   availability   - '' | 'readable' | 'borrowable' | 'open'
+ * @property {string}   fictionFilter  - '' | 'fiction' | 'nonfiction'
+ * @property {string[]} languages      - ISO 639-2/B codes e.g. ['eng', 'spa']
+ * @property {string[]} genres         - values from GENRE_OPTIONS e.g. ['mystery']
+ * @property {string[]} authors        - free-text author names
+ * @property {string[]} subjects       - free-text subject names
+ */
+
 // DEFAULT_FILTERS is the canonical name — "EMPTY" was a misnomer because
 // availability defaults to 'readable', not to a truly empty state.
 export const DEFAULT_FILTERS = {
@@ -175,6 +186,8 @@ export function shufflePick(arr, n) {
  * Derive the chip array from a filter state object.
  * Each chip label includes a human-readable "type: value" prefix.
  * Ordering: availability → fictionFilter → language → genre → author → subject
+ * @param {FilterState} filters
+ * @returns {{ type: string, label: string, value: string|null }[]}
  */
 export function buildChips(filters) {
   const chips = [];
@@ -223,6 +236,11 @@ export function buildChips(filters) {
  * Build URLSearchParams for a search request.
  * Multi-value arrays (languages, genres, authors, subjects) are each appended
  * as repeated params; the backend ORs them together within each facet.
+ * @param {string}      q
+ * @param {FilterState} filters
+ * @param {number}      page
+ * @param {number}      limit
+ * @returns {URLSearchParams}
  */
 export function buildSearchParams(q, filters, page, limit) {
   const p = new URLSearchParams();
