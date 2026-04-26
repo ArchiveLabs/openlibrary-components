@@ -28,7 +28,7 @@ export class OlSearchBar extends LitElement {
     q:           { type: String },
     chips:       { type: Array },
     showFacets:  { type: Boolean },
-    filters:     { type: Object },   // initial/external filter state
+    filters:     { type: Object, hasChanged(n, o) { return JSON.stringify(n) !== JSON.stringify(o); } },
     apiBase:     { type: String },   // prefix for /api/* calls, default ''
     siteBase:    { type: String },   // prefix for item links, default 'https://openlibrary.org'
     placeholder: { type: String },   // input placeholder text
