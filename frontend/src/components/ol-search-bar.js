@@ -83,7 +83,16 @@ export class OlSearchBar extends LitElement {
     this._lastFacetBtn    = null;   // button that opened the current facet dropdown (for focus return)
 
     this._onWinResize = () => {
-      if (this._open) { this._open = false; this._openFacet = null; }
+      if (!this._open) return;
+      const isMobile = window.matchMedia('(max-width: 600px)').matches;
+      if (isMobile && !this._mobileExpanded) {
+        this._mobileExpanded = true;           // shrunk into mobile — switch to full-screen overlay
+      } else if (!isMobile && this._mobileExpanded) {
+        this._mobileExpanded = false;          // grown out of mobile — switch to positioned panel
+        requestAnimationFrame(() => this._positionPanel());
+      } else if (!isMobile) {
+        requestAnimationFrame(() => this._positionPanel()); // desktop resize — reposition
+      }
     };
 
     this._onDoc = e => {
@@ -134,27 +143,37 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
-    // Anchor the panel to the trigger and focus the panel-input when it opens (desktop only).
-    if (changed.has('_open') && this._open && this.showFacets && !this._mobileExpanded) {
-      this._positionPanel();
+    // Anchor the panel to the trigger and focus the panel-input when it opens.
+    if (changed.has('_open') && this._open && this.showFacets) {
+      if (!this._mobileExpanded) this._positionPanel();
       requestAnimationFrame(() => this.shadowRoot?.querySelector('.panel-input')?.focus());
     }
   }
 
   // Set CSS custom properties on :host so the panel's position:fixed CSS vars resolve
-  // to the correct viewport-anchored coordinates. Right edge aligns with the trigger;
-  // panel extends leftward with a minimum width so facets never overflow.
+  // to the correct viewport-anchored coordinates.
+  // ≥900px: right-aligned with trigger, min 600px wide.
+  // 600–900px: horizontally centered, 85% viewport width.
   _positionPanel() {
     if (this._mobileExpanded) return;
     const trigger = this.shadowRoot?.querySelector('.input-row');
     if (!trigger) return;
-    const rect    = trigger.getBoundingClientRect();
-    const vw      = window.innerWidth;
-    const desired = Math.max(600, Math.min(860, rect.width));
-    const panelW  = Math.min(desired, rect.right - 8);
-    this.style.setProperty('--ol-panel-top',   `${rect.top}px`);
-    this.style.setProperty('--ol-panel-right', `${Math.max(0, vw - rect.right)}px`);
-    this.style.setProperty('--ol-panel-width', `${panelW}px`);
+    const rect = trigger.getBoundingClientRect();
+    const vw   = window.innerWidth;
+    this.style.setProperty('--ol-panel-top', `${rect.top}px`);
+    if (vw > 900) {
+      const desired = Math.max(600, Math.min(860, rect.width));
+      const panelW  = Math.min(desired, rect.right - 8);
+      this.style.setProperty('--ol-panel-width', `${panelW}px`);
+      this.style.setProperty('--ol-panel-right', `${Math.max(0, vw - rect.right)}px`);
+      this.style.setProperty('--ol-panel-left',  'auto');
+    } else {
+      const panelW = Math.max(600, Math.round(vw * 0.85));
+      const left   = Math.round((vw - panelW) / 2);
+      this.style.setProperty('--ol-panel-width', `${panelW}px`);
+      this.style.setProperty('--ol-panel-left',  `${left}px`);
+      this.style.setProperty('--ol-panel-right', 'auto');
+    }
   }
 
   // ── Filter helpers ────────────────────────────────────────────
@@ -484,14 +503,15 @@ export class OlSearchBar extends LitElement {
       flex:1; min-width:0; border:none; outline:none; cursor:pointer;
       background:transparent; font-size:14px; font-family:inherit;
       padding:2px 4px; text-align:left; color:hsl(0,0%,15%);
+      overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
     }
     .trigger-placeholder { color:hsl(0,0%,52%); }
 
     /* Panel-input row: real search input that lives inside the panel overlay */
     .panel-input-row {
-      display:flex; align-items:center; gap:5px;
+      display:flex; align-items:center; min-width:0; gap:6px;
       padding:6px 8px; border-bottom:1px solid hsl(0,0%,90%);
-      background:white;
+      background:white; border-radius:6.5px 6.5px 0 0;
     }
 
     /* Panel (droppable mode only) — position driven by CSS custom props set in _positionPanel() */
@@ -500,7 +520,7 @@ export class OlSearchBar extends LitElement {
       top:var(--ol-panel-top, auto);
       right:var(--ol-panel-right, 0px);
       width:var(--ol-panel-width, 600px);
-      left:auto;
+      left:var(--ol-panel-left, auto);
       background:white;
       border:1.5px solid hsl(202,96%,37%);
       border-radius:8px;
@@ -513,7 +533,6 @@ export class OlSearchBar extends LitElement {
       display:flex; border-bottom:1px solid hsl(0,0%,90%);
       background:hsl(0,0%,98.5%);
     }
-    .pf-bar--round { border-radius: 0 0 9px 9px; }
     .pf-wrap { flex:1; position:relative; display:flex; }
     .pf-wrap + .pf-wrap { border-left:1px solid hsl(0,0%,90%); }
     .pf-wrap--cog { flex:0 0 38px; }
@@ -595,6 +614,54 @@ export class OlSearchBar extends LitElement {
     }
     .ac-see-all:hover { background:hsl(202,96%,28%); }
 
+    /* ── Narrow trigger: icon-only (magnifying glass + barcode), right-aligned ── */
+    @media (max-width: 785px) {
+      .search-outer { display: flex; justify-content: flex-end; }
+      .input-row,
+      .input-row:focus-within,
+      .search-outer.open .input-row {
+        border: none; box-shadow: none; background: transparent;
+        padding: 0; border-radius: 8px; flex: none; gap: 6px;
+      }
+      .input-row .trigger-btn { display: none; }
+      .input-row .submit { margin-left: 0; }
+    }
+
+    /* ── Full-screen overlay — active whenever _mobileExpanded=true (any viewport) ── */
+    :host(.mobile-exp) {
+      position: fixed; inset: 0; z-index: 9000;
+      width: 100dvw; height: 100dvh;
+      display: flex; flex-direction: column;
+      background: white; overflow: hidden;
+    }
+    :host(.mobile-exp) .search-outer {
+      flex: 1; display: flex; flex-direction: column;
+    }
+    :host(.mobile-exp) .input-row { display: none; }
+    :host(.mobile-exp) .panel {
+      position: static; flex: 1;
+      width: 100%; box-sizing: border-box;
+      overflow: visible; max-height: none;
+      border: none; box-shadow: none; border-radius: 0;
+      border-top: none;
+    }
+    :host(.mobile-exp) .panel-chips { max-height: none; }
+    :host(.mobile-exp) .ac-scroll { max-height: 40vh; }
+    :host(.mobile-exp) .pf-bar { overflow: visible; flex-wrap: wrap; }
+
+    /* Back button shown at top of the expanded panel */
+    .mob-back-bar {
+      padding: 8px 12px 4px;
+      border-bottom: 1px solid hsl(0,0%,92%);
+      background: hsl(0,0%,98.5%);
+    }
+    .mob-back-btn {
+      background: none; border: none; cursor: pointer;
+      font-size: 14px; font-family: inherit; color: hsl(202,96%,37%);
+      padding: 4px 0; font-weight: 500;
+    }
+    .mob-back-btn:hover { color: hsl(202,96%,28%); }
+
     @media (max-width: 600px) {
       .pf-bar { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
       .pf-bar::-webkit-scrollbar { display: none; }
@@ -602,43 +669,6 @@ export class OlSearchBar extends LitElement {
       .submit { padding: 6px 10px; }
       .ac-scroll { max-height: 40vh; }
       .panel-chips { max-height: 72px; overflow-y: auto; }
-
-      /* ── Full-screen overlay (mobile-exp class toggled via JS) ── */
-      :host(.mobile-exp) {
-        position: fixed; inset: 0; z-index: 9000;
-        width: 100dvw; height: 100dvh;
-        display: flex; flex-direction: column;
-        background: white; overflow: hidden;
-      }
-      :host(.mobile-exp) .search-outer {
-        flex-shrink: 0; padding: 10px 12px;
-        border-bottom: 1.5px solid hsl(202,96%,37%);
-      }
-      :host(.mobile-exp) .search-outer.open .input-row {
-        border-bottom-left-radius: 8px;
-        border-bottom-right-radius: 8px;
-      }
-      :host(.mobile-exp) .panel {
-        position: static; flex: 1;
-        overflow-y: auto; max-height: none;
-        border: none; box-shadow: none; border-radius: 0;
-        border-top: none;
-      }
-      :host(.mobile-exp) .panel-chips { max-height: none; }
-      :host(.mobile-exp) .ac-scroll { max-height: none; }
-
-      /* Back button shown at top of the expanded panel */
-      .mob-back-bar {
-        padding: 8px 12px 4px;
-        border-bottom: 1px solid hsl(0,0%,92%);
-        background: hsl(0,0%,98.5%);
-      }
-      .mob-back-btn {
-        background: none; border: none; cursor: pointer;
-        font-size: 14px; font-family: inherit; color: hsl(202,96%,37%);
-        padding: 4px 0; font-weight: 500;
-      }
-      .mob-back-btn:hover { color: hsl(202,96%,28%); }
     }
   `;
 
@@ -700,9 +730,9 @@ export class OlSearchBar extends LitElement {
 
 
   // Order: avail → lang → genre → subject → author → sort → cog
-  _renderFacetBar(roundBottom = false) {
+  _renderFacetBar() {
     return html`
-      <div class="pf-bar ${roundBottom ? 'pf-bar--round' : ''}">
+      <div class="pf-bar">
         ${this._renderFacetBtn('avail',  false, 'pf-wrap--first')}
         ${this._renderFacetBtn('lang')}
         ${this._renderFacetBtn('genre')}
@@ -910,7 +940,7 @@ export class OlSearchBar extends LitElement {
                         aria-label="Clear all filters"
                         @click=${e => { e.stopPropagation(); this._clearAllFilters(); }}>Clear all</button>` : ''}
               </div>` : ''}
-            ${this._renderFacetBar(!this._loading && !showResults)}
+            ${this._renderFacetBar()}
             ${this._renderResults(q)}
           </div>` : ''}
       </div>`;

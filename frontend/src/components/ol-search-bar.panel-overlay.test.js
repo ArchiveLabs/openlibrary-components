@@ -16,6 +16,7 @@ function extractBlock(source, startToken) {
   return '';
 }
 
+// :host(.mobile-exp) rules are now standalone — search full src, not a media block.
 const mobileBlock  = extractBlock(src, '@media (max-width: 600px)');
 const panelCssIdx  = src.indexOf('.panel {');
 const panelCssEnd  = src.indexOf('}', panelCssIdx);
@@ -40,8 +41,8 @@ describe('ol-search-bar panel overlay — CSS positioning contract', () => {
     expect(panelCss).toMatch(/width\s*:\s*var\(--ol-panel-width/);
   });
 
-  it('panel left is auto so right+width control placement (not stretched)', () => {
-    expect(panelCss).toMatch(/left\s*:\s*auto/);
+  it('panel left is driven by --ol-panel-left CSS custom property', () => {
+    expect(panelCss).toMatch(/left\s*:\s*var\(--ol-panel-left/);
   });
 });
 
@@ -78,6 +79,10 @@ describe('ol-search-bar panel overlay — _positionPanel JS contract', () => {
 
   it('_positionPanel reads getBoundingClientRect from the trigger element', () => {
     expect(fnBody).toMatch(/getBoundingClientRect/);
+  });
+
+  it('_positionPanel sets --ol-panel-left via setProperty on the host', () => {
+    expect(fnBody).toMatch(/setProperty\s*\(\s*['"]--ol-panel-left['"]/);
   });
 });
 
@@ -130,17 +135,34 @@ describe('ol-search-bar panel overlay — window resize contract', () => {
     const cb = src.slice(src.indexOf('disconnectedCallback'), src.indexOf('disconnectedCallback') + 300);
     expect(cb).toMatch(/removeEventListener\s*\(\s*['"]resize['"]/);
   });
+
+  it('_onWinResize calls _positionPanel to reposition (does not just close the panel)', () => {
+    const fnIdx = src.indexOf('_onWinResize =');
+    const fnBody = fnIdx !== -1 ? src.slice(fnIdx, fnIdx + 500) : '';
+    expect(fnBody).toMatch(/_positionPanel/);
+  });
+
+  it('_onWinResize sets _mobileExpanded=true when viewport shrinks into mobile', () => {
+    const fnIdx = src.indexOf('_onWinResize =');
+    const fnBody = fnIdx !== -1 ? src.slice(fnIdx, fnIdx + 500) : '';
+    // isMobile branch must set _mobileExpanded = true
+    expect(fnBody).toMatch(/isMobile[\s\S]{0,80}_mobileExpanded\s*=\s*true/);
+  });
 });
 
 // ── Mobile overlay regression ─────────────────────────────────────────────────
 
 describe('ol-search-bar panel overlay — mobile overlay not broken', () => {
   it('mobile overlay still overrides panel to position:static', () => {
-    expect(mobileBlock).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*position\s*:\s*static/);
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*position\s*:\s*static/);
   });
 
   it('_onTriggerClick sets _mobileExpanded=true on narrow viewports', () => {
     const fn = src.slice(src.indexOf('_onTriggerClick'), src.indexOf('_onTriggerClick') + 300);
     expect(fn).toMatch(/_mobileExpanded\s*=\s*true/);
+  });
+
+  it('mobile overlay hides the trigger .input-row so two search inputs are not visible', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.input-row[^}]*display\s*:\s*none/);
   });
 });
