@@ -11,6 +11,7 @@ import {
   getSortLabel,
   getFictionLabel,
   EMPTY_FILTERS,
+  DEFAULT_FILTERS,
   AVAILABILITY_OPTIONS,
   FICTION_OPTIONS,
   POPULAR_SUBJECTS,
@@ -404,5 +405,45 @@ describe('spoofAvailabilityCounts', () => {
     expect(counts['readable']).toBeLessThanOrEqual(counts['']);
     expect(counts['open']).toBeLessThanOrEqual(counts['readable']);
     expect(counts['borrowable']).toBeLessThanOrEqual(counts['readable']);
+  });
+});
+
+// ── DEFAULT_FILTERS (renamed from EMPTY_FILTERS) ──────────────────────────────
+// These tests are written BEFORE the rename and will fail (red) until
+// DEFAULT_FILTERS is exported from filters.js.  They pin three things:
+//   1. The export exists under the new name
+//   2. The non-empty default (availability:'readable') is preserved
+//   3. EMPTY_FILTERS is kept as a re-export alias so existing callers don't break
+
+describe('DEFAULT_FILTERS', () => {
+  it('is exported from filters.js', () => {
+    expect(DEFAULT_FILTERS).toBeDefined();
+  });
+
+  it('has availability set to "readable" — the non-empty default that made EMPTY_FILTERS a misnomer', () => {
+    expect(DEFAULT_FILTERS.availability).toBe('readable');
+  });
+
+  it('has fictionFilter as empty string', () => {
+    expect(DEFAULT_FILTERS.fictionFilter).toBe('');
+  });
+
+  it('has empty arrays for languages, genres, authors, subjects', () => {
+    expect(DEFAULT_FILTERS.languages).toEqual([]);
+    expect(DEFAULT_FILTERS.genres).toEqual([]);
+    expect(DEFAULT_FILTERS.authors).toEqual([]);
+    expect(DEFAULT_FILTERS.subjects).toEqual([]);
+  });
+
+  it('has sort as empty string', () => {
+    expect(DEFAULT_FILTERS.sort).toBe('');
+  });
+
+  it('has the same shape and values as EMPTY_FILTERS (backward-compat alias)', () => {
+    expect(DEFAULT_FILTERS).toEqual(EMPTY_FILTERS);
+  });
+
+  it('EMPTY_FILTERS is still exported so existing import sites do not break', () => {
+    expect(EMPTY_FILTERS).toBeDefined();
   });
 });

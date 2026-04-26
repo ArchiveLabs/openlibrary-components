@@ -4,6 +4,8 @@ import {
   EMPTY_FILTERS, shufflePick, bestEdition,
   getSortLabel, buildChips,
 } from '../utils/filters.js';
+import { BREAKPOINTS } from '../utils/breakpoints.js';
+import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
 import './ol-howto-modal.js';
 import './ol-facet-drop.js';
 
@@ -84,7 +86,7 @@ export class OlSearchBar extends LitElement {
 
     this._onWinResize = () => {
       if (!this._open) return;
-      const isMobile = window.matchMedia('(max-width: 600px)').matches;
+      const isMobile = window.matchMedia(`(max-width: ${BREAKPOINTS.mobile}px)`).matches;
       if (isMobile && !this._mobileExpanded) {
         this._mobileExpanded = true;           // shrunk into mobile — switch to full-screen overlay
       } else if (!isMobile && this._mobileExpanded) {
@@ -161,7 +163,7 @@ export class OlSearchBar extends LitElement {
     const rect = trigger.getBoundingClientRect();
     const vw   = window.innerWidth;
     this.style.setProperty('--ol-panel-top', `${rect.top}px`);
-    if (vw > 900) {
+    if (vw > BREAKPOINTS.wide) {
       const desired = Math.max(600, Math.min(860, rect.width));
       const panelW  = Math.min(desired, rect.right - 8);
       this.style.setProperty('--ol-panel-width', `${panelW}px`);
@@ -192,7 +194,7 @@ export class OlSearchBar extends LitElement {
   _onTriggerClick(e) {
     e.stopPropagation();
     this._open = true;
-    if (window.matchMedia('(max-width: 600px)').matches) {
+    if (window.matchMedia(`(max-width: ${BREAKPOINTS.mobile}px)`).matches) {
       this._mobileExpanded = true;
     }
     this._openFacet = null;
@@ -369,10 +371,9 @@ export class OlSearchBar extends LitElement {
     const { signal } = this._authorAbort;
     this._authorTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
-        this._authorResults = d.docs ?? [];
-      } catch (err) {
-        if (err.name !== 'AbortError') this._authorResults = [];
+        this._authorResults = await fetchAuthorSuggestions(q, { signal, apiBase: this.apiBase });
+      } catch {
+        this._authorResults = [];
       } finally {
         if (!signal.aborted) this._facetsLoading = false;
       }
@@ -389,10 +390,9 @@ export class OlSearchBar extends LitElement {
     const { signal } = this._subjectAbort;
     this._subjectTimer = setTimeout(async () => {
       try {
-        const d = await (await fetch(`${this.apiBase}/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`, { signal })).json();
-        this._subjectResults = d.docs ?? [];
-      } catch (err) {
-        if (err.name !== 'AbortError') this._subjectResults = [];
+        this._subjectResults = await fetchSubjectSuggestions(q, { signal, apiBase: this.apiBase });
+      } catch {
+        this._subjectResults = [];
       } finally {
         if (!signal.aborted) this._facetsLoading = false;
       }

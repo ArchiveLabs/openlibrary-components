@@ -9,6 +9,7 @@ import {
   EMPTY_FILTERS, buildChips, buildSearchParams, shufflePick,
   getSortLabel,
 } from '../utils/filters.js';
+import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
 
 const LIMIT = 20;
 
@@ -352,8 +353,11 @@ export class OlSearchPage extends LitElement {
     const q = e.detail.q;
     if (q.trim().length < 2) { this._authorResults = []; return; }
     this._authorTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/authors/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
-      this._authorResults = d.docs ?? [];
+      try {
+        this._authorResults = await fetchAuthorSuggestions(q);
+      } catch {
+        this._authorResults = [];
+      }
     }, 250);
   }
 
@@ -362,8 +366,11 @@ export class OlSearchPage extends LitElement {
     const q = e.detail.q;
     if (q.trim().length < 2) { this._subjectResults = []; return; }
     this._subjectTimer = setTimeout(async () => {
-      const d = await (await fetch(`/api/subjects/search?q=${encodeURIComponent(q.trim())}&limit=8`)).json();
-      this._subjectResults = d.docs ?? [];
+      try {
+        this._subjectResults = await fetchSubjectSuggestions(q);
+      } catch {
+        this._subjectResults = [];
+      }
     }, 250);
   }
 
