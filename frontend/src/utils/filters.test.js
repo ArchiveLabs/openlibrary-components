@@ -468,4 +468,14 @@ describe('FilterState typedef', () => {
     const matches = [...filtersSrc.matchAll(/@param\s*\{FilterState\}/g)];
     expect(matches.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('FilterState uses literal-union types for sort, availability, and fictionFilter', () => {
+    const typedef = filtersSrc.slice(
+      filtersSrc.indexOf('@typedef {Object} FilterState'),
+      filtersSrc.indexOf('@typedef {Object} FilterState') + 600,
+    );
+    expect(typedef).toMatch(/'new'.*'old'|'old'.*'new'/);   // sort has at least two literals
+    expect(typedef).toMatch(/'readable'/);                  // availability literal
+    expect(typedef).toMatch(/'fiction'.*'nonfiction'|'nonfiction'.*'fiction'/); // fictionFilter literals
+  });
 });

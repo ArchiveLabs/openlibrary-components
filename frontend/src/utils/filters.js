@@ -122,13 +122,20 @@ export const POPULAR_AUTHORS = [
 
 /**
  * @typedef {Object} FilterState
- * @property {string}   sort           - '' | 'new' | 'old' | 'rating desc' | 'readinglog desc' | 'title'
- * @property {string}   availability   - '' | 'readable' | 'borrowable' | 'open'
- * @property {string}   fictionFilter  - '' | 'fiction' | 'nonfiction'
- * @property {string[]} languages      - ISO 639-2/B codes e.g. ['eng', 'spa']
- * @property {string[]} genres         - values from GENRE_OPTIONS e.g. ['mystery']
- * @property {string[]} authors        - free-text author names
- * @property {string[]} subjects       - free-text subject names
+ * @property {''|'new'|'old'|'rating desc'|'readinglog desc'|'title'} sort
+ *   Sort value from SORT_OPTIONS.
+ * @property {''|'readable'|'borrowable'|'open'} availability
+ *   Availability filter from AVAILABILITY_OPTIONS.
+ * @property {''|'fiction'|'nonfiction'} fictionFilter
+ *   Fiction/nonfiction filter.
+ * @property {string[]} [languages]
+ *   ISO 639-2/B codes e.g. ['eng', 'spa'].
+ * @property {string[]} [genres]
+ *   Values from GENRE_OPTIONS e.g. ['mystery'].
+ * @property {string[]} [authors]
+ *   Free-text author names.
+ * @property {string[]} [subjects]
+ *   Free-text subject names.
  */
 
 // DEFAULT_FILTERS is the canonical name — "EMPTY" was a misnomer because
@@ -184,7 +191,8 @@ export function shufflePick(arr, n) {
 
 /**
  * Derive the chip array from a filter state object.
- * Each chip label includes a human-readable "type: value" prefix.
+ * Chip labels are human-readable; language/genre/author/subject labels include a
+ * "type: value" prefix, while availability and fiction use plain descriptive labels.
  * Ordering: availability → fictionFilter → language → genre → author → subject
  * @param {FilterState} filters
  * @returns {{ type: string, label: string, value: string|null }[]}
