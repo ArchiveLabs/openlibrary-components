@@ -100,10 +100,7 @@ export class OlSearchBar extends LitElement {
     this._onDoc = e => {
       const path = e.composedPath();
       if (!path.includes(this)) {
-        this._openFacet = null;
-        this._open = false;
-        this._acFocusIdx = -1;
-        this._mobileExpanded = false;
+        this._closePanel();
       } else if (this._openFacet !== null) {
         const inFacetDrop = path.some(el => el?.tagName === 'OL-FACET-DROP');
         const inFacetBtn  = path.some(el => el?.classList?.contains?.('pf-btn'));
@@ -200,6 +197,14 @@ export class OlSearchBar extends LitElement {
     this._openFacet = null;
   }
 
+  // Single close path: keeps _open, _mobileExpanded, _openFacet, _acFocusIdx in sync.
+  _closePanel() {
+    this._open          = false;
+    this._mobileExpanded = false;
+    this._openFacet     = null;
+    this._acFocusIdx    = -1;
+  }
+
   _onInput(e) {
     this._q = e.target.value;
     if (this.showFacets) this._open = true;
@@ -256,8 +261,7 @@ export class OlSearchBar extends LitElement {
 
   _onKeyDown(e) {
     if (e.key === 'Escape') {
-      this._open = false; this._openFacet = null; this._acFocusIdx = -1;
-      this._mobileExpanded = false; return;
+      this._closePanel(); return;
     }
     // Arrow navigation through autocomplete results.
     if (this._open && this._suggestions.length > 0) {
@@ -782,7 +786,7 @@ export class OlSearchBar extends LitElement {
                    href="${this.siteBase}${linkKey}"
                    target="_blank" rel="noopener"
                    role="option"
-                   @click=${() => { this._open = false; this._mobileExpanded = false; }}>
+                   @click=${() => this._closePanel()}>
                   ${cover
                     ? html`<img class="ac-cover" src=${cover} alt="" loading="lazy">`
                     : html`<div class="ac-blank">📖</div>`}
@@ -806,7 +810,7 @@ export class OlSearchBar extends LitElement {
            target="_blank" rel="noopener"
            @click=${e => e.stopPropagation()}>+ Add Book</a>
         <button class="ac-see-all" @click=${() => {
-          this._open = false; this._mobileExpanded = false;
+          this._closePanel();
           if (!q && !this._hasActiveFilters()) return;
           this.dispatchEvent(new CustomEvent('ol-search', {
             detail: { q, filters: this._localFilters }, bubbles: true, composed: true,
@@ -895,7 +899,7 @@ export class OlSearchBar extends LitElement {
             ${this._mobileExpanded ? html`
               <div class="mob-back-bar">
                 <button class="mob-back-btn" aria-label="Close search"
-                        @click=${e => { e.stopPropagation(); this._mobileExpanded = false; this._open = false; this._openFacet = null; this._acFocusIdx = -1; }}>
+                        @click=${e => { e.stopPropagation(); this._closePanel(); }}>
                   ← Back
                 </button>
               </div>` : nothing}

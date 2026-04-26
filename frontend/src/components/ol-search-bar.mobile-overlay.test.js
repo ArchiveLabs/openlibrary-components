@@ -74,9 +74,9 @@ describe('ol-search-bar mobile overlay JS contract', () => {
     expect(fn).toMatch(/_mobileExpanded\s*=\s*true/);
   });
 
-  it('clears _mobileExpanded in _onKeyDown Escape path', () => {
+  it('calls _closePanel() in _onKeyDown Escape path', () => {
     const escapeBlock = src.slice(src.indexOf("key === 'Escape'"), src.indexOf("key === 'Escape'") + 200);
-    expect(escapeBlock).toMatch(/_mobileExpanded\s*=\s*false/);
+    expect(escapeBlock).toMatch(/_closePanel\(\)/);
   });
 
   it('toggles mobile-exp class on :host via updated()', () => {
