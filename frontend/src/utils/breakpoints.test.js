@@ -57,6 +57,24 @@ const searchBarSrc = readFileSync(
   new URL('../components/ol-search-bar.js', import.meta.url), 'utf8'
 );
 
+// ── Static analysis: CSS media queries match the JS constants ──────────────────
+// CSS @media cannot import JS, so the pixel values must be duplicated as literals.
+// These tests catch drift between the two.
+
+describe('ol-search-bar.js — CSS @media blocks match BREAKPOINTS values', () => {
+  it('CSS contains @media (max-width: <mobile>px) matching BREAKPOINTS.mobile', () => {
+    expect(searchBarSrc).toMatch(
+      new RegExp(`@media[^{]*max-width:\\s*${BREAKPOINTS.mobile}px`),
+    );
+  });
+
+  it('CSS contains @media (max-width: <narrow>px) matching BREAKPOINTS.narrow', () => {
+    expect(searchBarSrc).toMatch(
+      new RegExp(`@media[^{]*max-width:\\s*${BREAKPOINTS.narrow}px`),
+    );
+  });
+});
+
 describe('ol-search-bar.js — JS matchMedia calls use BREAKPOINTS, not raw literals', () => {
   it('does not call matchMedia with a raw 600px literal in JS', () => {
     // CSS template literals will still contain '600px' — narrow the match to
