@@ -143,7 +143,7 @@ The PR body should state which test proves the fix, or link the screenshot inlin
 
 ### Wait for Copilot review after opening a PR
 
-After opening a PR, **schedule a reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot typically posts its review within a few minutes of the PR being created; 8 minutes gives it enough time to finish without waiting too long.
+After opening a PR, **schedule a one-time reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot posts a single initial review shortly after the PR is created; it does **not** re-review subsequent commits, so only one check is needed.
 
 `ScheduleWakeup` fires in the **same session** that opened the PR, so the prompt can be short — all project context, AGENTS.md rules, and the reply+resolve workflow are already in conversation history. The prompt only needs to identify the PR number and the action:
 
@@ -156,7 +156,7 @@ When the reminder fires:
 2. Fetch the overview review: `gh pr view <PR> --repo ArchiveLabs/openlibrary-components --json reviews`
 3. Address every comment, push a fix commit, then reply and resolve each thread (see rule below).
 
-If there are no comments yet when the reminder fires, wait another few minutes before concluding there is no feedback.
+If there are no comments yet when the reminder fires, wait another few minutes — but do **not** schedule further checks. Copilot only reviews once.
 
 ### Responding to review comments (Copilot or human)
 
