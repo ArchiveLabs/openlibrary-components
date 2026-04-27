@@ -671,12 +671,12 @@ export class OlSearchBar extends LitElement {
     :host(.mobile-exp) .panel {
       position: static; flex: 1;
       width: 100%; box-sizing: border-box;
-      overflow: visible; max-height: none;
+      display: flex; flex-direction: column; overflow: visible; max-height: none;
       border: none; box-shadow: none; border-radius: 0;
       border-top: none;
     }
     :host(.mobile-exp) .panel-chips { max-height: none; }
-    :host(.mobile-exp) .ac-scroll { max-height: 40vh; }
+    :host(.mobile-exp) .ac-scroll { flex: 1; min-height: 0; max-height: none; overflow-y: auto; }
     :host(.mobile-exp) .pf-bar { overflow: visible; flex-wrap: wrap; }
 
     /* Back button shown at top of the expanded panel */

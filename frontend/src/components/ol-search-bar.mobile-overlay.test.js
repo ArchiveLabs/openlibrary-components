@@ -37,8 +37,8 @@ describe('ol-search-bar mobile overlay CSS contract', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*max-height\s*:\s*none/);
   });
 
-  it(':host(.mobile-exp) .ac-scroll has a vh-based max-height for results scrolling', () => {
-    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*max-height\s*:\s*\d+vh/);
+  it(':host(.mobile-exp) .ac-scroll grows to fill remaining panel height via flex: 1', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*flex\s*:\s*1/);
   });
 
   it(':host(.mobile-exp) .panel sets width:100% to override the desktop CSS var', () => {
