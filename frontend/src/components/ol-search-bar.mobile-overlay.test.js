@@ -45,9 +45,18 @@ describe('ol-search-bar mobile overlay CSS contract', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*min-height\s*:\s*0/);
   });
 
+  it(':host(.mobile-exp) .ac-scroll removes max-height cap so content fills the space', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*max-height\s*:\s*none/);
+  });
+
   it(':host(.mobile-exp) .panel is a flex column so children stack and ac-scroll can flex-grow', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*display\s*:\s*flex/);
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*flex-direction\s*:\s*column/);
+  });
+
+  it(':host(.mobile-exp) .panel and .search-outer both have min-height:0 to allow flex shrink', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*min-height\s*:\s*0/);
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.search-outer[^}]*min-height\s*:\s*0/);
   });
 
   it('@media 600px .ac-scroll rule is scoped to :host(:not(.mobile-exp)) — no specificity conflict', () => {
