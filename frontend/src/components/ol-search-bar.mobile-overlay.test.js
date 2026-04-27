@@ -41,6 +41,21 @@ describe('ol-search-bar mobile overlay CSS contract', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*flex\s*:\s*1/);
   });
 
+  it(':host(.mobile-exp) .ac-scroll has min-height:0 so it can shrink below content size', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*min-height\s*:\s*0/);
+  });
+
+  it(':host(.mobile-exp) .panel is a flex column so children stack and ac-scroll can flex-grow', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*display\s*:\s*flex/);
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*flex-direction\s*:\s*column/);
+  });
+
+  it('@media 600px .ac-scroll rule is scoped to :host(:not(.mobile-exp)) — no specificity conflict', () => {
+    const mediaBlock = src.slice(src.indexOf('@media (max-width: 600px)'), src.indexOf('@media (max-width: 600px)') + 400);
+    expect(mediaBlock).toMatch(/:host\(:not\(\.mobile-exp\)\)\s+\.ac-scroll/);
+    expect(mediaBlock).not.toMatch(/[^)]\s+\.ac-scroll\s*\{[^}]*max-height/); // plain .ac-scroll should not appear
+  });
+
   it(':host(.mobile-exp) .panel sets width:100% to override the desktop CSS var', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*width\s*:\s*100%/);
   });

@@ -702,7 +702,7 @@ export class OlSearchBar extends LitElement {
       .pf-bar::-webkit-scrollbar { display: none; }
       .pf-btn { font-size: 10px; padding: 11px 4px; }
       .submit { padding: 6px 10px; }
-      .ac-scroll { max-height: 40vh; }
+      :host(:not(.mobile-exp)) .ac-scroll { max-height: 40vh; }
       .panel-chips { max-height: 72px; overflow-y: auto; }
     }
   `;
