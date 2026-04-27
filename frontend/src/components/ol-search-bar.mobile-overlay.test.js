@@ -115,14 +115,15 @@ describe('ol-search-bar mobile overlay JS contract', () => {
     expect(src).toMatch(/classList\.toggle\s*\(\s*['"]mobile-exp['"]\s*,\s*this\._mobileExpanded\s*\)/);
   });
 
-  it('locks body scroll when mobile overlay opens and restores it when it closes', () => {
-    const updatedFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 1200);
+  it('locks body scroll when droppable panel opens and restores it when it closes', () => {
+    const updatedFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 2000);
     expect(updatedFn).toMatch(/document\.body\.style\.overflow/);
-    expect(updatedFn).toMatch(/_mobileExpanded.*hidden|hidden.*_mobileExpanded/s);
+    expect(updatedFn).toMatch(/this\._open.*this\.showFacets|this\.showFacets.*this\._open/s);
   });
 
-  it('restores body scroll in disconnectedCallback in case component is removed while expanded', () => {
-    const dcFn = src.slice(src.indexOf('disconnectedCallback()'), src.indexOf('disconnectedCallback()') + 400);
+  it('restores body scroll in disconnectedCallback via _scrollLockActive flag', () => {
+    const dcFn = src.slice(src.indexOf('disconnectedCallback()'), src.indexOf('disconnectedCallback()') + 600);
+    expect(dcFn).toMatch(/_scrollLockActive/);
     expect(dcFn).toMatch(/document\.body\.style\.overflow/);
   });
 });
