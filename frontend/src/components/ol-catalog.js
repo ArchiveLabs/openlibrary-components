@@ -227,7 +227,7 @@ export class OlCatalog extends LitElement {
           Unified search input used in two modes. <strong>Droppable</strong> (showFacets=true): owns
           local filter state, shows the facet panel and autocomplete on focus.
           <strong>Embedded</strong> (showFacets=false): display-only; receives chips as a prop and
-          fires <code>ol-chip-remove</code> events upward.
+          fires <code>ol-filter-change</code> events upward.
         </p>
 
         <div class="variant">
@@ -245,16 +245,19 @@ export class OlCatalog extends LitElement {
           <div class="preview white">
             <ol-search-bar
               .chips=${SAMPLE_CHIPS}
+              .filters=${{availability:'readable'}}
               .q=${'tolkien'}
             ></ol-search-bar>
           </div>
           <pre>&lt;ol-search-bar
   q="tolkien"
-  .chips="\${chips}"&gt;&lt;/ol-search-bar&gt;
+  .chips="\${chips}"
+  .filters="\${filters}"&gt;&lt;/ol-search-bar&gt;
 
-&lt;!-- chips: [{ type, label, value }, ...] --&gt;
-&lt;!-- fires: ol-chip-remove ({ type, value }) --&gt;
-&lt;!-- fires: ol-search ({ q, filters }) --&gt;</pre>
+&lt;!-- chips:   [{ type, label, value }, ...] --&gt;
+&lt;!-- filters: FilterState object — required for correct multi-value chip removal --&gt;
+&lt;!-- fires:   ol-filter-change ({ filter, value }) — same event as droppable mode --&gt;
+&lt;!-- fires:   ol-search ({ q, filters }) --&gt;</pre>
         </div>
       </div>
     `;
