@@ -211,3 +211,58 @@ test.describe('desktop — no overlay regression', () => {
     expect(hasMobileExp).toBe(false);
   });
 });
+
+// ── Desktop droppable — body scroll lock ─────────────────────────────────────
+//
+// Written BEFORE the fix that extended scroll locking from mobile-only to all
+// droppable modes.  These tests fail red on the old code and go green once
+// updated() gates the lock on _open && showFacets instead of _mobileExpanded.
+
+test.describe('desktop droppable — body scroll lock', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/');
+    await waitForSearchBar(page);
+  });
+
+  test('body and documentElement have overflow:hidden while droppable panel is open', async ({ page }) => {
+    await openSearch(page);
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?._open === true;
+    }, { timeout: 2000 });
+
+    const overflow = await page.evaluate(() => ({
+      body: getComputedStyle(document.body).overflow,
+      html: getComputedStyle(document.documentElement).overflow,
+    }));
+
+    expect(overflow.body).toBe('hidden');
+    expect(overflow.html).toBe('hidden');
+  });
+
+  test('body and documentElement overflow is restored after panel closes', async ({ page }) => {
+    await openSearch(page);
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?._open === true;
+    }, { timeout: 2000 });
+
+    await page.keyboard.press('Escape');
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?._open === false;
+    }, { timeout: 2000 });
+
+    const overflow = await page.evaluate(() => ({
+      body: document.body.style.overflow,
+      html: document.documentElement.style.overflow,
+    }));
+
+    expect(overflow.body).toBe('');
+    expect(overflow.html).toBe('');
+  });
+});

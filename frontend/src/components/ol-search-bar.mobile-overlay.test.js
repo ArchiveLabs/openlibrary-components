@@ -117,3 +117,34 @@ describe('ol-search-bar mobile overlay JS contract', () => {
     expect(dcFn).toMatch(/document\.body\.style\.overflow/);
   });
 });
+
+// ── Scroll lock — any droppable mode (issue #44 follow-up) ───────────────────
+//
+// Scroll lock must engage whenever the droppable search panel is open, not only
+// when the mobile full-screen overlay is active.  The gate is _open (the
+// universal open state) checked against showFacets (droppable mode), NOT
+// _mobileExpanded (mobile-only).
+
+describe('ol-search-bar scroll lock — any droppable panel open', () => {
+  // Find the line that acquires the lock so we can inspect its context.
+  const lockIdx = src.search(/this\._scrollLockActive\s*=\s*true/);
+  const lockCtx = lockIdx !== -1 ? src.slice(Math.max(0, lockIdx - 300), lockIdx) : '';
+
+  it('_scrollLockActive = true exists in source', () => {
+    expect(lockIdx).not.toBe(-1);
+  });
+
+  it('scroll lock acquire is gated on _open change (not _mobileExpanded) so desktop panel also locks scroll', () => {
+    expect(lockCtx).toMatch(/changed\.has\s*\(\s*'_open'\s*\)/);
+  });
+
+  it('scroll lock acquire condition checks showFacets so embedded mode does not lock scroll', () => {
+    expect(lockCtx).toMatch(/showFacets/);
+  });
+
+  it('disconnectedCallback restores overflow via _scrollLockActive flag', () => {
+    const dcFn = src.slice(src.indexOf('disconnectedCallback'), src.indexOf('disconnectedCallback') + 500);
+    expect(dcFn).toMatch(/_scrollLockActive/);
+    expect(dcFn).toMatch(/document\.body\.style\.overflow/);
+  });
+});
