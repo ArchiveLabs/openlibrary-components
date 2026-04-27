@@ -130,9 +130,10 @@ export class OlSearchBar extends LitElement {
     clearTimeout(this._timer);
     clearTimeout(this._authorTimer);
     clearTimeout(this._subjectTimer);
-    if (this._mobileExpanded) {
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
+    if (this._scrollLockActive) {
+      document.body.style.overflow            = this._prevBodyOverflow ?? '';
+      document.documentElement.style.overflow = this._prevDocumentOverflow ?? '';
+      this._scrollLockActive = false;
     }
   }
 
@@ -151,12 +152,23 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
-    // Prevent body scroll (both axes) while overlay is active so the page behind
-    // doesn't scroll. Lock <html> as well — some browsers/frameworks scroll it.
+    // Prevent body scroll while overlay is active; lock <html> too since many
+    // browsers/frameworks scroll it. Save pre-existing inline values so close
+    // restores exactly what was there before (avoids clobbering other overlays).
     if (changed.has('_mobileExpanded')) {
-      const lock = this._mobileExpanded ? 'hidden' : '';
-      document.body.style.overflow = lock;
-      document.documentElement.style.overflow = lock;
+      if (this._mobileExpanded && !this._scrollLockActive) {
+        this._prevBodyOverflow            = document.body.style.overflow;
+        this._prevDocumentOverflow        = document.documentElement.style.overflow;
+        this._scrollLockActive            = true;
+        document.body.style.overflow      = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+      } else if (!this._mobileExpanded && this._scrollLockActive) {
+        document.body.style.overflow            = this._prevBodyOverflow ?? '';
+        document.documentElement.style.overflow = this._prevDocumentOverflow ?? '';
+        this._scrollLockActive      = false;
+        this._prevBodyOverflow      = undefined;
+        this._prevDocumentOverflow  = undefined;
+      }
     }
     // Anchor the panel to the trigger and focus the panel-input when it opens.
     if (changed.has('_open') && this._open && this.showFacets) {
@@ -317,7 +329,9 @@ export class OlSearchBar extends LitElement {
     (f.genres    ?? []).forEach(g => p.append('subject', g));
     (f.authors   ?? []).forEach(a => p.append('author', a));
     (f.subjects  ?? []).forEach(s => p.append('subject', s));
-    return `${this.siteBase}/search?${p.toString()}`;
+    const url = new URL('/search', this.siteBase);
+    url.search = p.toString();
+    return url.toString();
   }
 
   _submit() {

@@ -215,6 +215,40 @@ test.describe('droppable submit navigation (issue #44)', () => {
     expect(page.url()).toMatch(/\/search\?.*q=frankenstein/);
   });
 
+  test('active filters are included in the navigation URL', async ({ page }) => {
+    // Set an availability filter directly on the droppable ol-search-bar's local state,
+    // then submit — the resulting URL must include the availability param.
+    await page.evaluate(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      sb?.shadowRoot?.querySelector('.trigger-btn')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    });
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?.shadowRoot?.querySelector('.panel-input') !== null;
+    });
+
+    // Type a query and set a filter via ol-filter-change event on the component
+    await page.evaluate(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      const input = sb?.shadowRoot?.querySelector('.panel-input');
+      if (input) { input.value = 'frankenstein'; input.dispatchEvent(new Event('input', { bubbles: true })); }
+      // Directly mutate _localFilters to simulate a filter selection
+      if (sb) sb._localFilters = { ...sb._localFilters, availability: 'readable' };
+    });
+
+    const navPromise = page.waitForURL(/\/search\?.*q=/, { timeout: 4000 });
+    await page.evaluate(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      sb?.shadowRoot?.querySelector('.panel .submit')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    });
+    await navPromise;
+
+    expect(page.url()).toMatch(/q=frankenstein/);
+    expect(page.url()).toMatch(/availability=readable/);
+  });
+
   test('ol-search event is cancelable — calling preventDefault() suppresses navigation', async ({ page }) => {
     // A host that handles ol-search itself can prevent the fallback URL navigation.
     await page.evaluate(() => {
