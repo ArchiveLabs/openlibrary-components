@@ -108,6 +108,25 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `style`
 
 Squash fixup commits; keep history as logical milestones.
 
+## Test-Driven Development
+
+**Write the test before the fix.** For every interactive bug or behavioral change:
+
+1. Write a failing Playwright test (or Vitest static-analysis test) that reproduces the problem.
+2. Commit it with a message like `test: failing test for <issue>`.
+3. Implement the fix until the test goes green.
+4. Commit the fix separately.
+
+This creates an unambiguous record that the test was driven by the behavior, not retrofitted after the fact.
+
+**Playwright for interactive behavior; Vitest for structure/layout.**
+- Use Playwright for: navigation, clicks, keyboard, event propagation, computed styles, layout dimensions.
+- Use Vitest (static-analysis) for: CSS property presence, method/event name conventions, code structure contracts.
+
+**Never rely on event-fires-only assertions for navigation bugs.** A test that only checks `window.__olSearchFired === true` does not catch a broken navigation path. Always assert the URL or a visible side-effect of the intended action.
+
+---
+
 ## Pull Request Standards
 
 ### Bug fixes must include evidence

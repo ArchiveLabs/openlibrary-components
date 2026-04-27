@@ -133,6 +133,67 @@ test.describe('mobile full-screen overlay (issue #23)', () => {
   });
 });
 
+// ── Body scroll lock (issue #44) ──────────────────────────────────────────────
+//
+// Written BEFORE the documentElement scroll-lock fix so they fail red first.
+// The previous fix locked document.body but not document.documentElement;
+// many browsers/frameworks scroll <html>, so the page behind the overlay
+// remained scrollable and a full-page scrollbar appeared.
+
+test.describe('mobile overlay — body scroll lock', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/');
+    await waitForSearchBar(page);
+  });
+
+  test('document.body and documentElement have overflow:hidden while overlay is open', async ({ page }) => {
+    await openSearch(page);
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?.classList.contains('mobile-exp') === true;
+    }, { timeout: 2000 });
+
+    const overflow = await page.evaluate(() => ({
+      body: getComputedStyle(document.body).overflow,
+      html: getComputedStyle(document.documentElement).overflow,
+    }));
+
+    expect(overflow.body).toBe('hidden');
+    expect(overflow.html).toBe('hidden');
+  });
+
+  test('body and documentElement overflow is restored after overlay closes', async ({ page }) => {
+    await openSearch(page);
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?.classList.contains('mobile-exp') === true;
+    }, { timeout: 2000 });
+
+    // Close via back button
+    await page.evaluate(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      sb?.shadowRoot?.querySelector('.mob-back-btn')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    });
+
+    await page.waitForFunction(() => {
+      const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
+      return sb?.classList.contains('mobile-exp') === false;
+    }, { timeout: 2000 });
+
+    const overflow = await page.evaluate(() => ({
+      body: document.body.style.overflow,
+      html: document.documentElement.style.overflow,
+    }));
+
+    expect(overflow.body).toBe('');
+    expect(overflow.html).toBe('');
+  });
+});
+
 test.describe('desktop — no overlay regression', () => {
   test('clicking search trigger on desktop does NOT add mobile-exp class', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
