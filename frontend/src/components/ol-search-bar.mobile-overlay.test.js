@@ -45,8 +45,16 @@ describe('ol-search-bar mobile overlay CSS contract', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*width\s*:\s*100%/);
   });
 
-  it(':host(.mobile-exp) .panel uses overflow:visible so facet dropdowns are not clipped', () => {
-    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*overflow\s*:\s*visible/);
+  it(':host(.mobile-exp) .panel uses overflow:hidden to bound the flex scroll region', () => {
+    // In full-screen mode the panel IS the viewport, so facet dropdowns remain
+    // within its bounds and are not clipped; overflow:hidden is needed so that
+    // flex children (ac-scroll) are properly height-constrained.
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*overflow\s*:\s*hidden/);
+  });
+
+  it(':host(.mobile-exp) .panel and .search-outer have min-height:0 so flex chain can shrink', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*min-height\s*:\s*0/);
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.search-outer[^}]*min-height\s*:\s*0/);
   });
 });
 
@@ -81,5 +89,16 @@ describe('ol-search-bar mobile overlay JS contract', () => {
 
   it('toggles mobile-exp class on :host via updated()', () => {
     expect(src).toMatch(/classList\.toggle\s*\(\s*['"]mobile-exp['"]\s*,\s*this\._mobileExpanded\s*\)/);
+  });
+
+  it('locks body scroll when mobile overlay opens and restores it when it closes', () => {
+    const updatedFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 1200);
+    expect(updatedFn).toMatch(/document\.body\.style\.overflow/);
+    expect(updatedFn).toMatch(/_mobileExpanded.*hidden|hidden.*_mobileExpanded/s);
+  });
+
+  it('restores body scroll in disconnectedCallback in case component is removed while expanded', () => {
+    const dcFn = src.slice(src.indexOf('disconnectedCallback()'), src.indexOf('disconnectedCallback()') + 400);
+    expect(dcFn).toMatch(/document\.body\.style\.overflow/);
   });
 });

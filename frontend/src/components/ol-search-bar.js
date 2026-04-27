@@ -124,6 +124,7 @@ export class OlSearchBar extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc, true);
     window.removeEventListener('resize', this._onWinResize);
+    if (this._mobileExpanded) document.body.style.overflow = '';
     this._acAbort?.abort();
     this._authorAbort?.abort();
     this._subjectAbort?.abort();
@@ -147,6 +148,10 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
+    // Prevent body scroll while overlay is active so the page behind doesn't scroll.
+    if (changed.has('_mobileExpanded')) {
+      document.body.style.overflow = this._mobileExpanded ? 'hidden' : '';
+    }
     // Anchor the panel to the trigger and focus the panel-input when it opens.
     if (changed.has('_open') && this._open && this.showFacets) {
       if (!this._mobileExpanded) this._positionPanel();
@@ -665,13 +670,13 @@ export class OlSearchBar extends LitElement {
       background: white; overflow: hidden;
     }
     :host(.mobile-exp) .search-outer {
-      flex: 1; display: flex; flex-direction: column;
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
     }
     :host(.mobile-exp) .input-row { display: none; }
     :host(.mobile-exp) .panel {
-      position: static; flex: 1;
+      position: static; flex: 1; min-height: 0;
       width: 100%; box-sizing: border-box;
-      display: flex; flex-direction: column; overflow: visible; max-height: none;
+      display: flex; flex-direction: column; overflow: hidden; max-height: none;
       border: none; box-shadow: none; border-radius: 0;
       border-top: none;
     }
