@@ -120,6 +120,24 @@ export const POPULAR_AUTHORS = [
   'Chimamanda Ngozi Adichie', 'Kazuo Ishiguro', 'Salman Rushdie', 'Milan Kundera',
 ];
 
+/**
+ * @typedef {Object} FilterState
+ * @property {''|'new'|'old'|'rating desc'|'readinglog desc'|'title'} sort
+ *   Sort value from SORT_OPTIONS.
+ * @property {''|'readable'|'borrowable'|'open'} availability
+ *   Availability filter from AVAILABILITY_OPTIONS.
+ * @property {''|'fiction'|'nonfiction'} fictionFilter
+ *   Fiction/nonfiction filter.
+ * @property {string[]} [languages]
+ *   ISO 639-2/B codes e.g. ['eng', 'spa'].
+ * @property {string[]} [genres]
+ *   Values from GENRE_OPTIONS e.g. ['mystery'].
+ * @property {string[]} [authors]
+ *   Free-text author names.
+ * @property {string[]} [subjects]
+ *   Free-text subject names.
+ */
+
 // DEFAULT_FILTERS is the canonical name — "EMPTY" was a misnomer because
 // availability defaults to 'readable', not to a truly empty state.
 export const DEFAULT_FILTERS = {
@@ -173,8 +191,11 @@ export function shufflePick(arr, n) {
 
 /**
  * Derive the chip array from a filter state object.
- * Each chip label includes a human-readable "type: value" prefix.
+ * Chip labels are human-readable; language/genre/author/subject labels include a
+ * "type: value" prefix, while availability and fiction use plain descriptive labels.
  * Ordering: availability → fictionFilter → language → genre → author → subject
+ * @param {FilterState} filters
+ * @returns {{ type: string, label: string, value: string|null }[]}
  */
 export function buildChips(filters) {
   const chips = [];
@@ -223,6 +244,11 @@ export function buildChips(filters) {
  * Build URLSearchParams for a search request.
  * Multi-value arrays (languages, genres, authors, subjects) are each appended
  * as repeated params; the backend ORs them together within each facet.
+ * @param {string}      q
+ * @param {FilterState} filters
+ * @param {number}      page
+ * @param {number}      limit
+ * @returns {URLSearchParams}
  */
 export function buildSearchParams(q, filters, page, limit) {
   const p = new URLSearchParams();
