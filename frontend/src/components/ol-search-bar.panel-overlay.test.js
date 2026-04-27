@@ -151,3 +151,45 @@ describe('ol-search-bar panel overlay — mobile overlay not broken', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.input-row[^}]*display\s*:\s*none/);
   });
 });
+
+// ── Autocomplete error state contract ─────────────────────────────────────────
+
+describe('ol-search-bar autocomplete error state', () => {
+  it('declares _acError as a reactive state property', () => {
+    expect(src).toMatch(/_acError\s*:\s*\{[^}]*state\s*:\s*true/);
+  });
+
+  it('initialises _acError to false in constructor', () => {
+    expect(src).toMatch(/this\._acError\s*=\s*false/);
+  });
+
+  it('sets _acError = true on non-abort fetch failure', () => {
+    const fetchFn = src.slice(src.indexOf('async _fetchAutocomplete()'), src.indexOf('async _fetchAutocomplete()') + 1500);
+    expect(fetchFn).toMatch(/_acError\s*=\s*true/);
+  });
+
+  it('resets _acError = false at the start of each fetch', () => {
+    const fetchFn = src.slice(src.indexOf('async _fetchAutocomplete()'), src.indexOf('async _fetchAutocomplete()') + 1500);
+    expect(fetchFn).toMatch(/_acError\s*=\s*false/);
+  });
+
+  it('_renderResults renders a .ac-error element when _acError is true', () => {
+    const renderFn = src.slice(src.indexOf('_renderResults(q)'), src.indexOf('_renderResults(q)') + 400);
+    expect(renderFn).toMatch(/ac-error/);
+    expect(renderFn).toMatch(/_acError/);
+  });
+
+  it('.ac-error CSS rule exists in component styles', () => {
+    expect(src).toMatch(/\.ac-error\s*\{/);
+  });
+
+  it('_onInput early-return path clears _acError so stale error does not persist', () => {
+    const fn = src.slice(src.indexOf('_onInput(e)'), src.indexOf('_onInput(e)') + 400);
+    expect(fn).toMatch(/_acError\s*=\s*false/);
+  });
+
+  it('_clearInput clears _acError so stale error does not persist', () => {
+    const fn = src.slice(src.indexOf('_clearInput()'), src.indexOf('_clearInput()') + 300);
+    expect(fn).toMatch(/_acError\s*=\s*false/);
+  });
+});
