@@ -29,13 +29,12 @@ describe('ol-search-bar event API — unified ol-filter-change', () => {
     expect(chipRemoveFn).toMatch(/ol-filter-change/);
   });
 
-  it('ol-search-page _onFilterChange handles all seven filter fields', () => {
+  it('ol-search-page _onFilterChange uses computed key spread — not a hard-coded switch', () => {
     const handler = searchPageSrc.slice(
       searchPageSrc.lastIndexOf('_onFilterChange'),
-      searchPageSrc.lastIndexOf('_onFilterChange') + 800,
+      searchPageSrc.lastIndexOf('_onFilterChange') + 300,
     );
-    for (const field of ['sort', 'availability', 'fictionFilter', 'languages', 'genres', 'authors', 'subjects']) {
-      expect(handler).toContain(`'${field}'`);
-    }
+    // Refactored: one-liner using computed key { ...this._filters, [filter]: value }
+    expect(handler).toMatch(/\[filter\]\s*:\s*value/);
   });
 });

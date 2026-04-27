@@ -6,12 +6,13 @@ import './ol-howto-modal.js';
 import './ol-search-hint.js';
 import {
   POPULAR_AUTHORS, POPULAR_SUBJECTS,
-  EMPTY_FILTERS, buildChips, buildSearchParams, shufflePick,
+  DEFAULT_FILTERS, buildChips, buildSearchParams, shufflePick,
   getSortLabel,
 } from '../utils/filters.js';
 import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
 
 const LIMIT = 20;
+const FILTER_KEYS = new Set(Object.keys(DEFAULT_FILTERS));
 
 const SHOWCASE_BOOKS = [
   { olid: 'OL27448W',   title: 'The Lord of the Rings',        href: 'https://openlibrary.org/works/OL27448W' },
@@ -53,14 +54,8 @@ export class OlSearchPage extends LitElement {
     _page:      { state: true },
     _lastQ:     { state: true },
 
-    // Filters (canonical state)
-    _sort:          { state: true },
-    _availability:  { state: true },
-    _fictionFilter: { state: true },
-    _languages:     { state: true },
-    _genres:        { state: true },
-    _authors:       { state: true },
-    _subjects:      { state: true },
+    // Filters (canonical state — single object, not 7 individual props)
+    _filters: { state: true },
 
     // Results filter bar UI state
     _openFacet:       { state: true },
@@ -83,13 +78,7 @@ export class OlSearchPage extends LitElement {
     this._page      = 1;
     this._lastQ     = null;
 
-    this._sort          = EMPTY_FILTERS.sort;
-    this._availability  = EMPTY_FILTERS.availability;
-    this._fictionFilter = EMPTY_FILTERS.fictionFilter;
-    this._languages     = [...EMPTY_FILTERS.languages];
-    this._genres        = [...EMPTY_FILTERS.genres];
-    this._authors       = [...EMPTY_FILTERS.authors];
-    this._subjects      = [...EMPTY_FILTERS.subjects];
+    this._filters = { ...DEFAULT_FILTERS };
 
     this._openFacet       = null;
     this._howtoOpen       = false;
@@ -146,36 +135,17 @@ export class OlSearchPage extends LitElement {
   }
 
   updated(changed) {
-    const broadcast = ['_lastQ', '_sort', '_availability', '_fictionFilter', '_languages', '_genres', '_authors', '_subjects'];
-    if (broadcast.some(k => changed.has(k))) {
+    if (changed.has('_lastQ') || changed.has('_filters')) {
+      const f = this._filters;
       window.dispatchEvent(new CustomEvent('ol-app-state', {
-        detail: { hasQuery: this._lastQ !== null, filters: this._filters, chips: this._chips },
+        detail: {
+          hasQuery: this._lastQ !== null,
+          // Defensive copy — listeners must not mutate internal state.
+          filters: { ...f, languages: [...f.languages], genres: [...f.genres], authors: [...f.authors], subjects: [...f.subjects] },
+          chips: buildChips(f),
+        },
       }));
     }
-  }
-
-  // ── Computed helpers ──────────────────────────────────────────
-  get _chips() {
-    return buildChips({
-      availability:  this._availability,
-      fictionFilter: this._fictionFilter,
-      languages:     this._languages,
-      genres:        this._genres,
-      authors:       this._authors,
-      subjects:      this._subjects,
-    });
-  }
-
-  get _filters() {
-    return {
-      sort:          this._sort,
-      availability:  this._availability,
-      fictionFilter: this._fictionFilter,
-      languages:     this._languages,
-      genres:        this._genres,
-      authors:       this._authors,
-      subjects:      this._subjects,
-    };
   }
 
   // ── Search ────────────────────────────────────────────────────
@@ -185,13 +155,14 @@ export class OlSearchPage extends LitElement {
     // the user set in the droppable so the results match what was shown in autocomplete.
     const f = e.detail?.filters;
     if (f) {
-      this._sort          = f.sort          ?? EMPTY_FILTERS.sort;
-      this._availability  = f.availability  ?? EMPTY_FILTERS.availability;
-      this._fictionFilter = f.fictionFilter ?? EMPTY_FILTERS.fictionFilter;
-      this._languages     = [...(f.languages ?? [])];
-      this._genres        = [...(f.genres    ?? [])];
-      this._authors       = [...(f.authors   ?? [])];
-      this._subjects      = [...(f.subjects  ?? [])];
+      this._filters = {
+        ...DEFAULT_FILTERS,
+        ...f,
+        languages: [...(f.languages ?? [])],
+        genres:    [...(f.genres    ?? [])],
+        authors:   [...(f.authors   ?? [])],
+        subjects:  [...(f.subjects  ?? [])],
+      };
     }
     const url = new URL(location.href);
     url.searchParams.set('q', this._lastQ);
@@ -256,30 +227,17 @@ export class OlSearchPage extends LitElement {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // ── Filter changes from ol-search-bar (hero) ──────────────────
+  // ── Filter changes from ol-search-bar ─────────────────────────
   _onFilterChange(e) {
     const { filter, value } = e.detail;
-    switch (filter) {
-      case 'sort':          this._sort          = value; break;
-      case 'availability':  this._availability  = value; break;
-      case 'fictionFilter': this._fictionFilter = value; break;
-      case 'languages':     this._languages     = value; break;
-      case 'genres':        this._genres        = value; break;
-      case 'authors':       this._authors       = value; break;
-      case 'subjects':      this._subjects      = value; break;
-    }
+    if (!FILTER_KEYS.has(filter)) return;
+    this._filters = { ...this._filters, [filter]: value };
     if (this._lastQ !== null) this._runSearch(1);
   }
 
   // ── Clear all filters ─────────────────────────────────────────
   _onClearAllFilters() {
-    this._sort          = EMPTY_FILTERS.sort;
-    this._availability  = EMPTY_FILTERS.availability;
-    this._fictionFilter = EMPTY_FILTERS.fictionFilter;
-    this._languages     = [...EMPTY_FILTERS.languages];
-    this._genres        = [...EMPTY_FILTERS.genres];
-    this._authors       = [...EMPTY_FILTERS.authors];
-    this._subjects      = [...EMPTY_FILTERS.subjects];
+    this._filters = { ...DEFAULT_FILTERS };
     if (this._lastQ !== null) this._runSearch(1);
   }
 
@@ -315,15 +273,8 @@ export class OlSearchPage extends LitElement {
 
   _rfApply(filter, value, keepOpen = false) {
     if (!keepOpen) this._openFacet = null;
-    switch (filter) {
-      case 'sort':          this._sort          = value; break;
-      case 'availability':  this._availability  = value; break;
-      case 'fictionFilter': this._fictionFilter = value; break;
-      case 'languages':     this._languages     = value; break;
-      case 'genres':        this._genres        = value; break;
-      case 'authors':       this._authors       = value; break;
-      case 'subjects':      this._subjects      = value; break;
-    }
+    if (!FILTER_KEYS.has(filter)) return;
+    this._filters = { ...this._filters, [filter]: value };
     this._runSearch(1);
   }
 
@@ -447,27 +398,29 @@ export class OlSearchPage extends LitElement {
   // ── Results filter bar render ─────────────────────────────────
 
   _rfLabel(name) {
+    const f = this._filters;
     switch (name) {
-      case 'sort':   return this._sort ? getSortLabel(this._sort) : 'Sort by';
+      case 'sort':   return f.sort ? getSortLabel(f.sort) : 'Sort by';
       case 'avail':  return 'Availability';
-      case 'lang':   return this._languages.length ? `Language (${this._languages.length})` : 'Language';
+      case 'lang':   return f.languages.length ? `Language (${f.languages.length})` : 'Language';
       case 'genre': {
-        const total = this._genres.length + (this._fictionFilter ? 1 : 0);
+        const total = f.genres.length + (f.fictionFilter ? 1 : 0);
         return total ? `Genre (${total})` : 'Genre';
       }
-      case 'author': return this._authors.length  ? `Author (${this._authors.length})`  : 'Author';
-      case 'subject':return this._subjects.length ? `Subject (${this._subjects.length})`: 'Subject';
+      case 'author': return f.authors.length  ? `Author (${f.authors.length})`  : 'Author';
+      case 'subject':return f.subjects.length ? `Subject (${f.subjects.length})`: 'Subject';
     }
   }
 
   _rfActive(name) {
+    const f = this._filters;
     switch (name) {
-      case 'sort':   return !!this._sort;
-      case 'avail':  return !!this._availability;
-      case 'lang':   return this._languages.length > 0;
-      case 'genre':  return this._genres.length > 0 || !!this._fictionFilter;
-      case 'author': return this._authors.length > 0;
-      case 'subject':return this._subjects.length > 0;
+      case 'sort':   return !!f.sort;
+      case 'avail':  return !!f.availability;
+      case 'lang':   return f.languages.length > 0;
+      case 'genre':  return f.genres.length > 0 || !!f.fictionFilter;
+      case 'author': return f.authors.length > 0;
+      case 'subject':return f.subjects.length > 0;
     }
   }
 
@@ -544,7 +497,7 @@ export class OlSearchPage extends LitElement {
       <div class="results-wrap">
         <ol-search-bar
           .q=${this._lastQ ?? ''}
-          .chips=${this._chips}
+          .chips=${buildChips(this._filters)}
           .filters=${this._filters}
         ></ol-search-bar>
 
