@@ -99,7 +99,7 @@ describe('ol-search-bar panel overlay — panel-input contract', () => {
   });
 
   it('updated() focuses the panel-input when the panel opens', () => {
-    const updFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 1200);
+    const updFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 2000);
     expect(updFn).toMatch(/panel-input/);
   });
 });

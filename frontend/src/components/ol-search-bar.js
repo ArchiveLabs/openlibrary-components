@@ -124,13 +124,17 @@ export class OlSearchBar extends LitElement {
     super.disconnectedCallback();
     document.removeEventListener('click', this._onDoc, true);
     window.removeEventListener('resize', this._onWinResize);
-    if (this._mobileExpanded) document.body.style.overflow = '';
     this._acAbort?.abort();
     this._authorAbort?.abort();
     this._subjectAbort?.abort();
     clearTimeout(this._timer);
     clearTimeout(this._authorTimer);
     clearTimeout(this._subjectTimer);
+    if (this._scrollLockActive) {
+      document.body.style.overflow            = this._prevBodyOverflow ?? '';
+      document.documentElement.style.overflow = this._prevDocumentOverflow ?? '';
+      this._scrollLockActive = false;
+    }
   }
 
   updated(changed) {
@@ -148,9 +152,24 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
-    // Prevent body scroll while overlay is active so the page behind doesn't scroll.
-    if (changed.has('_mobileExpanded')) {
-      document.body.style.overflow = this._mobileExpanded ? 'hidden' : '';
+    // Lock body scroll whenever the droppable panel is open on any viewport.
+    // Lock <html> too since many browsers/frameworks scroll it.
+    // Save pre-existing inline values so close restores them exactly.
+    if (changed.has('_open')) {
+      const shouldLock = this._open && this.showFacets;
+      if (shouldLock && !this._scrollLockActive) {
+        this._prevBodyOverflow            = document.body.style.overflow;
+        this._prevDocumentOverflow        = document.documentElement.style.overflow;
+        this._scrollLockActive            = true;
+        document.body.style.overflow      = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+      } else if (!shouldLock && this._scrollLockActive) {
+        document.body.style.overflow            = this._prevBodyOverflow ?? '';
+        document.documentElement.style.overflow = this._prevDocumentOverflow ?? '';
+        this._scrollLockActive      = false;
+        this._prevBodyOverflow      = undefined;
+        this._prevDocumentOverflow  = undefined;
+      }
     }
     // Anchor the panel to the trigger and focus the panel-input when it opens.
     if (changed.has('_open') && this._open && this.showFacets) {
@@ -298,13 +317,37 @@ export class OlSearchBar extends LitElement {
     if (e.key === 'Enter') this._submit();
   }
 
+  // Build a search results URL from query + current filters.
+  // Used as the fallback navigation target in droppable mode when no host
+  // cancels the ol-search event.
+  _buildSearchUrl(q, f = {}) {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (f.sort)           p.set('sort', f.sort);
+    if (f.availability)   p.set('availability', f.availability);
+    if (f.fictionFilter)  p.set('subject', f.fictionFilter);
+    (f.languages ?? []).forEach(l => p.append('language', l));
+    (f.genres    ?? []).forEach(g => p.append('subject', g));
+    (f.authors   ?? []).forEach(a => p.append('author', a));
+    (f.subjects  ?? []).forEach(s => p.append('subject', s));
+    const url = new URL('/search', this.siteBase);
+    url.search = p.toString();
+    return url.toString();
+  }
+
   _submit() {
     if (!this._q.trim() && !this._hasActiveFilters()) return;
     this._mobileExpanded = false;
-    this.dispatchEvent(new CustomEvent('ol-search', {
+    const event = new CustomEvent('ol-search', {
       detail: { q: this._q.trim(), filters: this._localFilters },
-      bubbles: true, composed: true,
-    }));
+      bubbles: true, composed: true, cancelable: true,
+    });
+    this.dispatchEvent(event);
+    // In droppable mode navigate to the search results page unless the host
+    // handled the event itself and called e.preventDefault().
+    if (this.showFacets && !event.defaultPrevented) {
+      window.location.href = this._buildSearchUrl(this._q.trim(), this._localFilters);
+    }
   }
 
   // ── Clear-all filters ─────────────────────────────────────────
@@ -844,9 +887,13 @@ export class OlSearchBar extends LitElement {
         <button class="ac-see-all" @click=${() => {
           this._closePanel();
           if (!q && !this._hasActiveFilters()) return;
-          this.dispatchEvent(new CustomEvent('ol-search', {
-            detail: { q, filters: this._localFilters }, bubbles: true, composed: true,
-          }));
+          const event = new CustomEvent('ol-search', {
+            detail: { q, filters: this._localFilters }, bubbles: true, composed: true, cancelable: true,
+          });
+          this.dispatchEvent(event);
+          if (this.showFacets && !event.defaultPrevented) {
+            window.location.href = this._buildSearchUrl(q, this._localFilters);
+          }
         }}>See all ${this._total.toLocaleString()} results →</button>
       </div>`;
   }

@@ -108,6 +108,25 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `style`
 
 Squash fixup commits; keep history as logical milestones.
 
+## Test-Driven Development
+
+**Write the test before the fix.** For every interactive bug or behavioral change:
+
+1. Write a failing Playwright test (or Vitest static-analysis test) that reproduces the problem.
+2. Commit it with a message like `test: failing test for <issue>`.
+3. Implement the fix until the test goes green.
+4. Commit the fix separately.
+
+This creates an unambiguous record that the test was driven by the behavior, not retrofitted after the fact.
+
+**Playwright for interactive behavior; Vitest for structure/layout.**
+- Use Playwright for: navigation, clicks, keyboard, event propagation, computed styles, layout dimensions.
+- Use Vitest (static-analysis) for: CSS property presence, method/event name conventions, code structure contracts.
+
+**Never rely on event-fires-only assertions for navigation bugs.** A test that only checks `window.__olSearchFired === true` does not catch a broken navigation path. Always assert the URL or a visible side-effect of the intended action.
+
+---
+
 ## Pull Request Standards
 
 ### Bug fixes must include evidence
@@ -124,7 +143,7 @@ The PR body should state which test proves the fix, or link the screenshot inlin
 
 ### Wait for Copilot review after opening a PR
 
-After opening a PR, **schedule a reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot typically posts its review within a few minutes of the PR being created; 8 minutes gives it enough time to finish without waiting too long.
+After opening a PR, **schedule a one-time reminder to check for Copilot feedback in ~8 minutes** using `ScheduleWakeup`. Copilot posts a single initial review shortly after the PR is created; it does **not** re-review subsequent commits, so only one check is needed.
 
 `ScheduleWakeup` fires in the **same session** that opened the PR, so the prompt can be short — all project context, AGENTS.md rules, and the reply+resolve workflow are already in conversation history. The prompt only needs to identify the PR number and the action:
 
@@ -137,7 +156,7 @@ When the reminder fires:
 2. Fetch the overview review: `gh pr view <PR> --repo ArchiveLabs/openlibrary-components --json reviews`
 3. Address every comment, push a fix commit, then reply and resolve each thread (see rule below).
 
-If there are no comments yet when the reminder fires, wait another few minutes before concluding there is no feedback.
+If there are no comments yet when the reminder fires, wait another few minutes — but do **not** schedule further checks. Copilot only reviews once.
 
 ### Responding to review comments (Copilot or human)
 

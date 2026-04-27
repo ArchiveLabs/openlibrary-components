@@ -45,9 +45,18 @@ describe('ol-search-bar mobile overlay CSS contract', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*min-height\s*:\s*0/);
   });
 
+  it(':host(.mobile-exp) .ac-scroll removes max-height cap so content fills the space', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.ac-scroll[^}]*max-height\s*:\s*none/);
+  });
+
   it(':host(.mobile-exp) .panel is a flex column so children stack and ac-scroll can flex-grow', () => {
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*display\s*:\s*flex/);
     expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*flex-direction\s*:\s*column/);
+  });
+
+  it(':host(.mobile-exp) .panel and .search-outer both have min-height:0 to allow flex shrink', () => {
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.panel[^}]*min-height\s*:\s*0/);
+    expect(src).toMatch(/:host\(\.mobile-exp\)\s+\.search-outer[^}]*min-height\s*:\s*0/);
   });
 
   it('@media 600px .ac-scroll rule is scoped to :host(:not(.mobile-exp)) — no specificity conflict', () => {
@@ -106,14 +115,46 @@ describe('ol-search-bar mobile overlay JS contract', () => {
     expect(src).toMatch(/classList\.toggle\s*\(\s*['"]mobile-exp['"]\s*,\s*this\._mobileExpanded\s*\)/);
   });
 
-  it('locks body scroll when mobile overlay opens and restores it when it closes', () => {
-    const updatedFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 1200);
+  it('locks body scroll when droppable panel opens and restores it when it closes', () => {
+    const updatedFn = src.slice(src.indexOf('updated(changed)'), src.indexOf('updated(changed)') + 2000);
     expect(updatedFn).toMatch(/document\.body\.style\.overflow/);
-    expect(updatedFn).toMatch(/_mobileExpanded.*hidden|hidden.*_mobileExpanded/s);
+    expect(updatedFn).toMatch(/this\._open.*this\.showFacets|this\.showFacets.*this\._open/s);
   });
 
-  it('restores body scroll in disconnectedCallback in case component is removed while expanded', () => {
-    const dcFn = src.slice(src.indexOf('disconnectedCallback()'), src.indexOf('disconnectedCallback()') + 400);
+  it('restores body scroll in disconnectedCallback via _scrollLockActive flag', () => {
+    const dcFn = src.slice(src.indexOf('disconnectedCallback()'), src.indexOf('disconnectedCallback()') + 600);
+    expect(dcFn).toMatch(/_scrollLockActive/);
+    expect(dcFn).toMatch(/document\.body\.style\.overflow/);
+  });
+});
+
+// ── Scroll lock — any droppable mode (issue #44 follow-up) ───────────────────
+//
+// Scroll lock must engage whenever the droppable search panel is open, not only
+// when the mobile full-screen overlay is active.  The gate is _open (the
+// universal open state) checked against showFacets (droppable mode), NOT
+// _mobileExpanded (mobile-only).
+
+describe('ol-search-bar scroll lock — any droppable panel open', () => {
+  // Find the line that acquires the lock so we can inspect its context.
+  const lockIdx = src.search(/this\._scrollLockActive\s*=\s*true/);
+  const lockCtx = lockIdx !== -1 ? src.slice(Math.max(0, lockIdx - 300), lockIdx) : '';
+
+  it('_scrollLockActive = true exists in source', () => {
+    expect(lockIdx).not.toBe(-1);
+  });
+
+  it('scroll lock acquire is gated on _open change (not _mobileExpanded) so desktop panel also locks scroll', () => {
+    expect(lockCtx).toMatch(/changed\.has\s*\(\s*'_open'\s*\)/);
+  });
+
+  it('scroll lock acquire condition checks showFacets so embedded mode does not lock scroll', () => {
+    expect(lockCtx).toMatch(/showFacets/);
+  });
+
+  it('disconnectedCallback restores overflow via _scrollLockActive flag', () => {
+    const dcFn = src.slice(src.indexOf('disconnectedCallback'), src.indexOf('disconnectedCallback') + 500);
+    expect(dcFn).toMatch(/_scrollLockActive/);
     expect(dcFn).toMatch(/document\.body\.style\.overflow/);
   });
 });
