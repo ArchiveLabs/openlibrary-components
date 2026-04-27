@@ -152,17 +152,18 @@ export class OlSearchBar extends LitElement {
     }
     // Sync full-screen overlay class on the host element.
     this.classList.toggle('mobile-exp', this._mobileExpanded);
-    // Prevent body scroll while overlay is active; lock <html> too since many
-    // browsers/frameworks scroll it. Save pre-existing inline values so close
-    // restores exactly what was there before (avoids clobbering other overlays).
-    if (changed.has('_mobileExpanded')) {
-      if (this._mobileExpanded && !this._scrollLockActive) {
+    // Lock body scroll whenever the droppable panel is open on any viewport.
+    // Lock <html> too since many browsers/frameworks scroll it.
+    // Save pre-existing inline values so close restores them exactly.
+    if (changed.has('_open')) {
+      const shouldLock = this._open && this.showFacets;
+      if (shouldLock && !this._scrollLockActive) {
         this._prevBodyOverflow            = document.body.style.overflow;
         this._prevDocumentOverflow        = document.documentElement.style.overflow;
         this._scrollLockActive            = true;
         document.body.style.overflow      = 'hidden';
         document.documentElement.style.overflow = 'hidden';
-      } else if (!this._mobileExpanded && this._scrollLockActive) {
+      } else if (!shouldLock && this._scrollLockActive) {
         document.body.style.overflow            = this._prevBodyOverflow ?? '';
         document.documentElement.style.overflow = this._prevDocumentOverflow ?? '';
         this._scrollLockActive      = false;
