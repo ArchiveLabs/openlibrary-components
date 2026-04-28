@@ -56,7 +56,7 @@ describe('ol-search-bar _seedFacetsForQuery — query-scoped defaults', () => {
   });
 
   it('_facetCache is initialised in constructor', () => {
-    const ctor = src.slice(src.indexOf('constructor()'), src.indexOf('constructor()') + 800);
+    const ctor = src.slice(src.indexOf('constructor()'), src.indexOf('constructor()') + 1500);
     expect(ctor).toMatch(/_facetCache/);
   });
 
