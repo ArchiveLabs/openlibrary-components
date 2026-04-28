@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional
 
@@ -136,20 +135,42 @@ async def subject_search(q: str = "", limit: int = 10):
 
 
 @app.get("/api/search/facets")
-async def search_facets(q: str = ""):
-    data = json.dumps({
-        "param": {"q": q},
-        "path": "/search",
-        "query": f"?q={q}&mode=everything",
-    })
+async def search_facets(q: str = "", rows: int = 30, limit: int = 25):
+    """Aggregate subject_facet and author_facet from OL search results for a query."""
+    if not q.strip():
+        return {"authors": [], "subjects": []}
+
     async with httpx.AsyncClient() as client:
         resp = await client.get(
-            f"{OL_BASE}/partials/SearchFacets.json",
-            params={"data": data},
+            f"{OL_BASE}/search.json",
+            params={"q": q, "fields": "subject_facet,author_facet", "rows": rows},
             timeout=10.0,
         )
         resp.raise_for_status()
-    return resp.json()
+
+    docs = resp.json().get("docs", [])
+    subj_counts: dict[str, int] = {}
+    auth_index: dict[str, dict] = {}
+
+    for doc in docs:
+        for s in doc.get("subject_facet", []):
+            subj_counts[s] = subj_counts.get(s, 0) + 1
+        for a in doc.get("author_facet", []):
+            parts = a.split(" ", 1)
+            if len(parts) == 2:
+                key, name = parts
+                if name not in auth_index:
+                    auth_index[name] = {"name": name, "key": key, "count": 0}
+                auth_index[name]["count"] += 1
+
+    subjects = sorted(
+        [{"name": k, "count": v} for k, v in subj_counts.items()],
+        key=lambda x: -x["count"],
+    )[:limit]
+
+    authors = sorted(auth_index.values(), key=lambda x: -x["count"])[:12]
+
+    return {"authors": list(authors), "subjects": subjects}
 
 
 _static = Path(__file__).parent / "static"

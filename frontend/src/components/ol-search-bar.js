@@ -5,7 +5,7 @@ import {
   getSortLabel, buildChips,
 } from '../utils/filters.js';
 import { BREAKPOINTS } from '../utils/breakpoints.js';
-import { fetchAuthorSuggestions, fetchSubjectSuggestions } from '../utils/facets.js';
+import { fetchAuthorSuggestions, fetchSubjectSuggestions, fetchQueryFacets } from '../utils/facets.js';
 import './ol-howto-modal.js';
 import './ol-facet-drop.js';
 
@@ -87,6 +87,8 @@ export class OlSearchBar extends LitElement {
     this._acAbort         = null;   // AbortController for in-flight autocomplete fetch
     this._authorAbort     = null;   // AbortController for author search
     this._subjectAbort    = null;   // AbortController for subject search
+    this._facetAbort      = null;   // AbortController for query-facet fetch
+    this._facetCache      = new Map(); // query → { authors, subjects } — avoids re-fetching
     this._lastFacetBtn    = null;   // button that opened the current facet dropdown (for focus return)
 
     this._onWinResize = () => {
@@ -428,7 +430,33 @@ export class OlSearchBar extends LitElement {
   _toggleFacet(name, e) {
     e.stopPropagation();
     if (this._openFacet !== name) this._lastFacetBtn = e.currentTarget;
+    const opening = this._openFacet !== name;
     this._openFacet = this._openFacet === name ? null : name;
+    if (opening && (name === 'author' || name === 'subject') && this._q.trim()) {
+      this._seedFacetsForQuery(this._q.trim());
+    }
+  }
+
+  async _seedFacetsForQuery(q) {
+    if (this._facetCache.has(q)) {
+      const cached = this._facetCache.get(q);
+      this._defaultAuthors  = shufflePick(cached.authors, 6);
+      this._defaultSubjects = shufflePick(cached.subjects, 6);
+      return;
+    }
+    this._facetAbort?.abort();
+    this._facetAbort = new AbortController();
+    this._facetsLoading = true;
+    try {
+      const result = await fetchQueryFacets(q, { signal: this._facetAbort.signal, apiBase: this.apiBase });
+      this._facetCache.set(q, result);
+      this._defaultAuthors  = shufflePick(result.authors, 6);
+      this._defaultSubjects = shufflePick(result.subjects, 6);
+    } catch {
+      // Keep current defaults on error
+    } finally {
+      if (!this._facetAbort?.signal.aborted) this._facetsLoading = false;
+    }
   }
 
   _onDropFacetChange(e) {
@@ -761,8 +789,8 @@ export class OlSearchBar extends LitElement {
         const total = (f.genres?.length ?? 0) + (f.fictionFilter ? 1 : 0);
         return total ? `Genre (${total})` : 'Genre';
       }
-      case 'author':  return f.authors?.length    ? `Author (${f.authors.length})`    : 'Author';
-      case 'subject': return f.subjects?.length   ? `Subject (${f.subjects.length})`  : 'Subject';
+      case 'author':  return f.authors?.length    ? `Authors (${f.authors.length})`    : 'Authors';
+      case 'subject': return f.subjects?.length   ? `Subjects (${f.subjects.length})` : 'Subjects';
     }
   }
 
@@ -799,8 +827,14 @@ export class OlSearchBar extends LitElement {
             @ol-facet-change=${this._onDropFacetChange}
             @ol-facet-search-authors=${this._onDropAuthorSearch}
             @ol-facet-search-subjects=${this._onDropSubjectSearch}
-            @ol-facet-shuffle-authors=${() => { this._defaultAuthors = shufflePick(POPULAR_AUTHORS, 6); }}
-            @ol-facet-shuffle-subjects=${() => { this._defaultSubjects = shufflePick(POPULAR_SUBJECTS, 6); }}
+            @ol-facet-shuffle-authors=${() => {
+              const pool = (this._q.trim() && this._facetCache.get(this._q.trim())?.authors) || POPULAR_AUTHORS;
+              this._defaultAuthors = shufflePick(pool, 6);
+            }}
+            @ol-facet-shuffle-subjects=${() => {
+              const pool = (this._q.trim() && this._facetCache.get(this._q.trim())?.subjects) || POPULAR_SUBJECTS;
+              this._defaultSubjects = shufflePick(pool, 6);
+            }}
           ></ol-facet-drop>
         ` : ''}
       </div>`;
