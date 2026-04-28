@@ -228,12 +228,11 @@ test.describe('droppable submit navigation (issue #44)', () => {
       return sb?.shadowRoot?.querySelector('.panel-input') !== null;
     });
 
-    // Type a query and set a filter via ol-filter-change event on the component
+    // Type a query and mutate _localFilters directly to simulate a filter selection
     await page.evaluate(() => {
       const sb = document.querySelector('ol-header')?.shadowRoot?.querySelector('ol-search-bar');
       const input = sb?.shadowRoot?.querySelector('.panel-input');
       if (input) { input.value = 'frankenstein'; input.dispatchEvent(new Event('input', { bubbles: true })); }
-      // Directly mutate _localFilters to simulate a filter selection
       if (sb) sb._localFilters = { ...sb._localFilters, availability: 'readable' };
     });
 
