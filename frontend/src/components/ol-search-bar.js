@@ -428,7 +428,12 @@ export class OlSearchBar extends LitElement {
   _toggleFacet(name, e) {
     e.stopPropagation();
     if (this._openFacet !== name) this._lastFacetBtn = e.currentTarget;
+    const opening = this._openFacet !== name;
     this._openFacet = this._openFacet === name ? null : name;
+    if (opening && this._q.trim()) {
+      if (name === 'author')  this._onDropAuthorSearch({ detail: { q: this._q.trim() } });
+      if (name === 'subject') this._onDropSubjectSearch({ detail: { q: this._q.trim() } });
+    }
   }
 
   _onDropFacetChange(e) {
@@ -761,8 +766,8 @@ export class OlSearchBar extends LitElement {
         const total = (f.genres?.length ?? 0) + (f.fictionFilter ? 1 : 0);
         return total ? `Genre (${total})` : 'Genre';
       }
-      case 'author':  return f.authors?.length    ? `Author (${f.authors.length})`    : 'Author';
-      case 'subject': return f.subjects?.length   ? `Subject (${f.subjects.length})`  : 'Subject';
+      case 'author':  return f.authors?.length    ? `Authors (${f.authors.length})`    : 'Authors';
+      case 'subject': return f.subjects?.length   ? `Subjects (${f.subjects.length})` : 'Subjects';
     }
   }
 

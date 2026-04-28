@@ -6,7 +6,7 @@ const src = readFileSync(new URL('./ol-search-bar.js', import.meta.url), 'utf8')
 // ── Facet label pluralization ─────────────────────────────────────────────────
 
 describe('ol-search-bar facet label pluralization', () => {
-  const facetLabelFn = src.slice(src.indexOf('_facetLabel(name)'), src.indexOf('_facetLabel(name)') + 600);
+  const facetLabelFn = src.slice(src.indexOf('_facetLabel(name)'), src.indexOf('_facetLabel(name)') + 700);
 
   it('_facetLabel returns "Authors" (plural) when no authors are selected', () => {
     expect(facetLabelFn).toMatch(/['"]Authors['"]/);
